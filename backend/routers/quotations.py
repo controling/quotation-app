@@ -25,6 +25,7 @@ class QuotationCreate(BaseModel):
 
 
 class QuotationUpdate(BaseModel):
+    item_id: int = 0
     title: str | None = None
     customer_name: str | None = None
     contact_person: str | None = None
@@ -102,17 +103,20 @@ def create_quotation(data: QuotationCreate, db: Session = Depends(get_db), user=
     return q_to_dict(q)
 
 
+class QuotationDelete(BaseModel):
+    item_id: int = 0
+
 @router.post("/get")
-def get_quotation(item_id: int = 0, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    q = db.query(Quotation).filter(Quotation.id == item_id).first()
+def get_quotation(data: QuotationDelete, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    q = db.query(Quotation).filter(Quotation.id == data.item_id).first()
     if not q:
         raise HTTPException(status_code=404, detail="报价单不存在")
     return q_to_dict(q)
 
 
 @router.post("/update")
-def update_quotation(data: QuotationUpdate, item_id: int = 0, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    q = db.query(Quotation).filter(Quotation.id == item_id).first()
+def update_quotation(data: QuotationUpdate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    q = db.query(Quotation).filter(Quotation.id == data.item_id).first()
     if not q:
         raise HTTPException(status_code=404, detail="报价单不存在")
 
@@ -129,8 +133,8 @@ def update_quotation(data: QuotationUpdate, item_id: int = 0, db: Session = Depe
 
 
 @router.post("/delete")
-def delete_quotation(item_id: int = 0, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    q = db.query(Quotation).filter(Quotation.id == item_id).first()
+def delete_quotation(data: QuotationDelete, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    q = db.query(Quotation).filter(Quotation.id == data.item_id).first()
     if not q:
         raise HTTPException(status_code=404, detail="报价单不存在")
     db.delete(q)
