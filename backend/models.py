@@ -20,6 +20,7 @@ class QuotationType(str, enum.Enum):
 
 class QuotationStatus(str, enum.Enum):
     draft = "draft"
+    confirmed = "confirmed"
     sent = "sent"
     cancelled = "cancelled"
 
