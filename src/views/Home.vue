@@ -64,6 +64,38 @@
       </div>
     </div>
 
+    <!-- Auto Generate from Text -->
+    <div class="section-head">
+      <h3>智能生成报价单</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select v-model="quoteType" style="font-size:12px;padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:#fff">
+          <option value="drug">药品</option>
+          <option value="packaging">药包材</option>
+        </select>
+      </div>
+    </div>
+    <div class="m-card" style="margin-bottom:12px">
+      <div style="padding:10px 14px">
+        <textarea
+          v-model="pasteText"
+          placeholder="粘贴内容自动生成报价单，支持以下格式：&#10;&#10;格式1（每行一个）: 样品名+空格+检测项目&#10;  中药饮片-丁香 性状&#10;  中药饮片-丁香 水分&#10;&#10;格式2（制表符分隔）: 样品名[TAB]检测项目&#10;  玻璃安瓶  外观&#10;  玻璃安瓶  内应力&#10;&#10;也可直接粘贴Excel数据"
+          style="width:100%;height:120px;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;resize:vertical;box-sizing:border-box;line-height:1.6;font-family:inherit"
+        ></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+          <button class="btn btn-ghost btn-sm" @click="pasteFromClipboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            读取剪贴板
+          </button>
+          <div style="flex:1"></div>
+          <span style="font-size:12px;color:var(--text-3)">{{ matchedCount > 0 ? `已匹配 ${matchedCount} 项` : '' }}</span>
+          <button class="btn btn-primary btn-sm" @click="onAutoGenerate" :disabled="!pasteText.trim()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+            生成报价单
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Recent Quotations -->
     <div class="section-head">
       <h3>药品报价单</h3>
@@ -128,23 +160,143 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuotationsStore } from '../stores/quotations'
-import { statsApi } from '../api'
+import { statsApi, drugItemsApi, packagingItemsApi, itemsApi } from '../api'
+import { toast } from '../utils/toast'
 
 const router = useRouter()
 const quoteStore = useQuotationsStore()
 
 const stats = ref({ drug_items: 0, packaging_items: 0, drug_quotes: 0, packaging_quotes: 0, total_quotes: 0, total_amount: 0 })
 
+// Auto generate from text
+const pasteText = ref('')
+const quoteType = ref('drug')
+const matchedCount = ref(0)
+const allDrugItems = ref([])
+const allPkgItems = ref([])
+
+// Preload items for matching
 onMounted(async () => {
   try {
     const res = await statsApi.get()
     stats.value = res.data
   } catch {}
   quoteStore.loadQuotations()
+  // Load all items for matching
+  try {
+    const { data } = await drugItemsApi.list({ page: 1, page_size: 500 })
+    for (const s of (data.samples || [])) allDrugItems.value.push(...s.items)
+  } catch {}
+  try {
+    const { data } = await packagingItemsApi.list({ page: 1, page_size: 500 })
+    for (const s of (data.samples || [])) allPkgItems.value.push(...s.items)
+  } catch {}
 })
+
+// Watch paste text to show match count
+watch(pasteText, () => {
+  if (!pasteText.value.trim()) { matchedCount.value = 0; return }
+  const matched = matchItems(pasteText.value)
+  matchedCount.value = matched.length
+})
+
+function matchItems(text) {
+  const items = quoteType.value === 'drug' ? allDrugItems.value : allPkgItems.value
+  const lines = text.split(/\n/).map(l => l.trim()).filter(Boolean)
+  const results = []
+  for (const line of lines) {
+    // Split by tab, multiple spaces, or single space
+    const parts = line.split(/\t| {2,}/).map(p => p.trim()).filter(Boolean)
+    let keywords = []
+    if (parts.length >= 2) {
+      // Format: sample_name + test_item (or more columns)
+      keywords = parts
+    } else {
+      // Single line - split by space as keyword
+      keywords = line.split(/\s+/).filter(Boolean)
+    }
+    // Find best matching item
+    let best = null
+    let bestScore = 0
+    for (const item of items) {
+      let score = 0
+      const target = `${item.category} ${item.name}`.toLowerCase()
+      for (const kw of keywords) {
+        const k = kw.toLowerCase()
+        if (target.includes(k)) score += k.length
+      }
+      // Exact item name match bonus
+      if (item.name.toLowerCase() === keywords[keywords.length - 1]?.toLowerCase()) score += 100
+      // Exact category match bonus
+      if (keywords.length > 1 && item.category.toLowerCase().includes(keywords[0].toLowerCase())) score += 50
+      if (score > bestScore) { bestScore = score; best = item }
+    }
+    if (best && bestScore > 0) {
+      // Avoid duplicates
+      if (!results.find(r => r.id === best.id)) {
+        results.push({ ...best })
+      }
+    }
+  }
+  return results
+}
+
+async function pasteFromClipboard() {
+  try {
+    const text = await navigator.clipboard.readText()
+    if (text) pasteText.value = text
+    else toast('剪贴板为空')
+  } catch {
+    toast('无法读取剪贴板，请手动粘贴')
+  }
+}
+
+async function onAutoGenerate() {
+  const text = pasteText.value.trim()
+  if (!text) { toast('请先输入或粘贴内容'); return }
+  const matched = matchItems(text)
+  if (matched.length === 0) { toast('未匹配到检测项目，请检查输入内容'); return }
+
+  // Group by category (sample)
+  const cart = matched.map(item => ({
+    id: item.id, name: item.name, category: item.category,
+    standard: item.standard, method: item.method,
+    unit_price: item.unit_price, quantity: 1,
+    cma: item.cma, cnas: item.cnas,
+    cycle_days: item.cycle_days, description: item.description
+  }))
+
+  const cartSamples = [...new Set(cart.map(i => i.category))]
+  const total = cart.reduce((s, i) => s + i.unit_price * i.quantity, 0)
+  const sampleName = cartSamples.join('、')
+
+  // Get customer name from first line if it looks like one, otherwise use default
+  const customerName = '智能报价单'
+
+  try {
+    const q = await quoteStore.createQuotationDirect({
+      title: customerName, customer_name: customerName, contact_person: '',
+      sample_name: sampleName, quotation_type: quoteType.value,
+      total_amount: total,
+      items_json: cart.map(i => ({
+        id: i.id, name: i.name, category: i.category,
+        standard: i.standard, method: i.method,
+        unit_price: i.unit_price, quantity: i.quantity,
+        subtotal: i.unit_price * i.quantity,
+        cma: i.cma, cnas: i.cnas,
+        cycle_days: i.cycle_days, description: i.description
+      }))
+    })
+    toast(`已匹配 ${matched.length} 项，报价单已生成`)
+    pasteText.value = ''
+    router.push('/quote-preview/' + q.id)
+  } catch (e) {
+    toast('生成失败: ' + (e.response?.data?.detail || e.message || ''))
+  }
+}
 
 const drugQuotations = computed(() => quoteStore.quotations.filter(q => q.type === 'drug'))
 const pkgQuotations = computed(() => quoteStore.quotations.filter(q => q.type === 'packaging'))
