@@ -72,7 +72,7 @@
       <div style="padding:10px 14px">
         <textarea
           v-model="pasteText"
-          placeholder="粘贴样品名称或检测项目，一行一个，支持多种分隔符&#10;&#10;示例：&#10;  八角茴香&#10;  马松子&#10;  亚甲蓝, 性状, 水分&#10;  中药饮片-丁香  含量测定&#10;  玻璃安瓶；外观；内应力&#10;&#10;也可直接粘贴Excel数据"
+          placeholder="粘贴样品名称，一行一个或用逗号分隔&#10;&#10;示例：&#10;  八角茴香&#10;  马松子&#10;  亚甲蓝&#10;  八角茴香, 马松子, 亚甲蓝&#10;&#10;输入样品名会自动匹配该样品下所有检测项目&#10;也可粘贴Excel数据"
           style="width:100%;height:120px;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;resize:vertical;box-sizing:border-box;line-height:1.6;font-family:inherit"
         ></textarea>
         <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
@@ -177,12 +177,12 @@ onMounted(async () => {
   } catch {}
   quoteStore.loadQuotations()
   try {
-    const { data } = await drugItemsApi.list({ page: 1, page_size: 500 })
-    for (const s of (data.samples || [])) allDrugItems.value.push(...s.items)
+    const { data } = await itemsApi.all('drug')
+    allDrugItems.value = data.items || []
   } catch {}
   try {
-    const { data } = await packagingItemsApi.list({ page: 1, page_size: 500 })
-    for (const s of (data.samples || [])) allPkgItems.value.push(...s.items)
+    const { data } = await itemsApi.all('packaging')
+    allPkgItems.value = data.items || []
   } catch {}
 })
 
@@ -195,37 +195,42 @@ watch(pasteText, () => {
 
 function matchItems(text, type) {
   const items = type === 'drug' ? allDrugItems.value : allPkgItems.value
-  // Split by any combination of: newline, comma, semicolon, pipe, tab, Chinese punctuation
-  const lines = text.split(/[\n,，;；|｜\t]+/).map(l => l.trim()).filter(Boolean)
+  // Split by any combination of: newline, comma, semicolon, pipe, tab, Chinese punctuation, space
+  const tokens = text.split(/[\n,，;；|｜\t、\r]+/).map(l => l.trim()).filter(Boolean)
   const results = []
-  for (const line of lines) {
-    // Try to split further by spaces if there are multiple words
-    const parts = line.split(/\s+/).filter(Boolean)
-    // If only one keyword (sample name only), match by category
-    if (parts.length === 1) {
-      const kw = parts[0].toLowerCase()
-      const matched = items.filter(item => item.category.toLowerCase().includes(kw))
-      for (const m of matched) {
+  for (const token of tokens) {
+    // Try to detect "sample + item" format: last word is item name, rest is sample
+    const words = token.split(/\s+/).filter(Boolean)
+    // Strategy 1: treat entire token as a sample name, find ALL items for that sample
+    const catMatched = items.filter(item => item.category.includes(token))
+    if (catMatched.length > 0) {
+      for (const m of catMatched) {
         if (!results.find(r => r.id === m.id)) results.push({ ...m })
       }
-    } else {
-      // Multiple parts - find best matching item
-      let best = null
-      let bestScore = 0
-      for (const item of items) {
-        let score = 0
-        const catLow = item.category.toLowerCase()
-        const nameLow = item.name.toLowerCase()
-        for (const kw of parts) {
-          const k = kw.toLowerCase()
-          if (nameLow === k) score += 100
-          else if (nameLow.includes(k)) score += 30
-          if (catLow.includes(k)) score += 20
+      continue
+    }
+    // Strategy 2: if multiple words, try each word as sample name or item name
+    if (words.length > 1) {
+      // First try: last word is item name, rest is sample
+      const sampleKw = words.slice(0, -1).join('')
+      const itemKw = words[words.length - 1]
+      const matched = items.filter(item =>
+        item.category.includes(sampleKw) && item.name.includes(itemKw)
+      )
+      if (matched.length > 0) {
+        for (const m of matched) {
+          if (!results.find(r => r.id === m.id)) results.push({ ...m })
         }
-        if (score > bestScore) { bestScore = score; best = item }
+        continue
       }
-      if (best && bestScore > 0 && !results.find(r => r.id === best.id)) {
-        results.push({ ...best })
+      // Second try: any word matches sample or item
+      for (const w of words) {
+        const wMatched = items.filter(item =>
+          item.category.includes(w) || item.name.includes(w)
+        )
+        for (const m of wMatched) {
+          if (!results.find(r => r.id === m.id)) results.push({ ...m })
+        }
       }
     }
   }

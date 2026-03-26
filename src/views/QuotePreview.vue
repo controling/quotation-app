@@ -160,7 +160,7 @@
         <div class="popup-header">
           <div>
             <h3>添加检测项目</h3>
-            <span class="popup-sub">共 {{ cartAddItems.length }} 项可添加</span>
+            <span class="popup-sub">共 {{ cartAddItems.length }} 项</span>
           </div>
           <div class="sheet-close" @click="showCartAddPopup = false">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -169,7 +169,7 @@
         <div style="padding:0 14px 8px">
           <div class="m-search-bar" style="height:36px">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" placeholder="搜索项目名称或样品..." v-model="cartAddSearch" @input="onCartAddSearch" />
+            <input type="text" placeholder="搜索样品名或检测项目..." v-model="cartAddSearch" @input="onCartAddSearch" />
           </div>
         </div>
         <div class="popup-actions">
@@ -178,20 +178,25 @@
           <button class="btn btn-sm btn-primary" @click="addItemsToEdit">加入 ({{ selectedEditIds.size }})</button>
         </div>
         <div class="popup-items">
-          <van-checkbox-group v-model="selectedEditIdsArr">
-            <van-cell v-for="item in cartAddItems" :key="item.id" clickable @click="toggleEditItem(item.id)">
-              <template #title>
-                <div style="display:flex;align-items:center;gap:8px">
+          <div v-for="group in cartAddSampleGroups" :key="group.name" style="border-bottom:1px solid var(--border);padding-bottom:4px;margin-bottom:4px">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;cursor:pointer" @click="toggleSampleItems(group)">
+              <div style="display:flex;align-items:center;gap:6px">
+                <van-checkbox :model-value="isSampleFullySelected(group)" @update:model-value="v => toggleSampleItems(group, v)" @click.stop />
+                <span style="font-weight:600;font-size:13px;color:var(--primary)">{{ group.name }}</span>
+              </div>
+              <span style="font-size:11px;color:var(--text-3)">{{ group.items.length }}项</span>
+            </div>
+            <van-checkbox-group v-model="selectedEditIdsArr">
+              <div v-for="item in group.items" :key="item.id" style="display:flex;align-items:center;justify-content:space-between;padding:5px 12px 5px 32px;cursor:pointer" @click="toggleEditItem(item.id)">
+                <div style="display:flex;align-items:center;gap:6px">
                   <van-checkbox :name="item.id" @click.stop />
-                  <div>
-                    <div style="font-weight:500">{{ item.name }}</div>
-                    <div style="font-size:12px;color:var(--text-3)">{{ item.category }} | {{ item.method || '-' }}</div>
-                  </div>
+                  <span style="font-size:13px">{{ item.name }}</span>
+                  <span style="font-size:11px;color:var(--text-3)">{{ item.method || '-' }}</span>
                 </div>
-              </template>
-              <template #value><span class="price">¥{{ item.unit_price }}</span></template>
-            </van-cell>
-          </van-checkbox-group>
+                <span class="price" style="font-size:13px">¥{{ item.unit_price }}</span>
+              </div>
+            </van-checkbox-group>
+          </div>
         </div>
       </div>
     </van-popup>
@@ -263,14 +268,43 @@ function openAddItemForSample(sample) {
 async function loadCartAddItems() {
   try {
     const itemType = quotation.value?.type === 'packaging' ? 'packaging' : 'drug'
-    const { data } = await itemsApi.list({ type: itemType, search: cartAddSearch.value, page: 1, page_size: 50 })
+    const { data } = await itemsApi.all(itemType)
     const existingIds = new Set(editForm.value.items.map(i => i.id))
-    cartAddItems.value = (data.items || []).filter(i => !existingIds.has(i.id))
+    let items = (data.items || []).filter(i => !existingIds.has(i.id))
+    if (cartAddSearch.value) {
+      const q = cartAddSearch.value.toLowerCase()
+      items = items.filter(i => i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q))
+    }
+    cartAddItems.value = items
   } catch {}
 }
 function onCartAddSearch() {
   clearTimeout(cartAddTimer)
   cartAddTimer = setTimeout(() => loadCartAddItems(), 300)
+}
+
+const cartAddSampleGroups = computed(() => {
+  const map = {}
+  cartAddItems.value.forEach(item => {
+    const cat = item.category || '未分类'
+    if (!map[cat]) map[cat] = { name: cat, items: [] }
+    map[cat].items.push(item)
+  })
+  return Object.values(map).sort((a, b) => a.name.localeCompare(b.name, 'zh'))
+})
+
+function isSampleFullySelected(group) {
+  return group.items.every(i => selectedEditIds.value.has(i.id))
+}
+
+function toggleSampleItems(group, forceVal) {
+  const allSelected = isSampleFullySelected(group)
+  const shouldSelect = forceVal !== undefined ? forceVal : !allSelected
+  for (const item of group.items) {
+    if (shouldSelect) selectedEditIds.value.add(item.id)
+    else selectedEditIds.value.delete(item.id)
+  }
+  selectedEditIds.value = new Set(selectedEditIds.value)
 }
 function addItemsToEdit() {
   const targetSample = cartAddSample.value
