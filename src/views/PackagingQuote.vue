@@ -45,7 +45,7 @@
             <input type="text" placeholder="搜索包材名称..." v-model="sampleSearch" @input="onSampleSearch" />
           </div>
         </div>
-        <div class="sample-list" ref="sampleListRef" style="padding:0 14px 8px;max-height:60vh;overflow-y:auto">
+        <div class="sample-list" ref="sampleListRef" style="padding:0 14px 8px">
           <div
             v-for="cat in displayedCategories"
             :key="cat"
@@ -398,15 +398,16 @@ function onCartAddSearch() {
 const cartAddFilteredItems = computed(() => cartAddItems.value)
 function addItemsToCartSample() {
   const items = cartAddItems.value.filter(i => selectedIds.value.has(i.id))
+  const targetSample = cartAddSample.value
   let added = 0
   for (const item of items) {
     if (!cart.value.find(c => c.id === item.id)) {
-      cart.value.push({ id: item.id, name: item.name, category: item.category, standard: item.standard, method: item.method, unit_price: item.unit_price, quantity: 1, cma: item.cma, cnas: item.cnas, cycle_days: item.cycle_days, description: item.description })
+      cart.value.push({ id: item.id, name: item.name, category: targetSample, standard: item.standard, method: item.method, unit_price: item.unit_price, quantity: 1, cma: item.cma, cnas: item.cnas, cycle_days: item.cycle_days, description: item.description })
       added++
     }
   }
   showCartAddPopup.value = false
-  if (added) toast(`已添加 ${added} 项`)
+  if (added) toast(`已添加 ${added} 项到「${targetSample}」`)
 }
 const cartTotal = computed(() => cart.value.reduce((sum, i) => sum + i.unit_price * i.quantity, 0))
 function goStep(i) { if (i <= currentStep.value) currentStep.value = i }
