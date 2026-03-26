@@ -24,7 +24,7 @@ class ItemsListParams(BaseModel):
 
 def _split_search(search: str) -> list[str]:
     """将搜索词按多种分隔符拆分为多个关键词"""
-    terms = re.split(r'[,，;；、\\/|]', search)
+    terms = re.split(r'[,，;；、:：\\/\\|\s]+', search)
     return [t.strip() for t in terms if t.strip()]
 
 

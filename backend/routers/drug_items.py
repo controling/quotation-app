@@ -68,7 +68,7 @@ def list_items(params: ListParams, db: Session = Depends(get_db), user=Depends(g
         q = q.filter(DrugItem.category == params.category)
 
     if params.search:
-        terms = [t.strip() for t in re.split(r'[,，;；、\\/|]', params.search) if t.strip()]
+        terms = [t.strip() for t in re.split(r'[,，;；、:：\\/\\|\s]+', params.search) if t.strip()]
         if terms:
             conds = []
             for term in terms:
