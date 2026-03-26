@@ -231,7 +231,7 @@ import { useRouter } from 'vue-router'
 import { toast } from '../utils/toast'
 import { useDrugItemsStore } from '../stores/drugItems'
 import { useQuotationsStore } from '../stores/quotations'
-import { drugItemsApi } from '../api'
+import { drugItemsApi, itemsApi } from '../api'
 
 const router = useRouter()
 const store = useDrugItemsStore()
@@ -398,16 +398,9 @@ let cartAddTimer = null
 
 async function loadCartAddItems() {
   try {
-    const { data } = await drugItemsApi.list({ search: cartAddSearch.value, page: 1, page_size: 50 })
+    const { data } = await itemsApi.list({ type: 'drug', search: cartAddSearch.value, page: 1, page_size: 50 })
     const existingIds = new Set(cart.value.map(i => i.id))
-    cartAddItems.value = []
-    for (const sample of (data.samples || [])) {
-      for (const item of sample.items) {
-        if (!existingIds.has(item.id)) {
-          cartAddItems.value.push(item)
-        }
-      }
-    }
+    cartAddItems.value = (data.items || []).filter(i => !existingIds.has(i.id))
     cartAddTotal.value = data.total
   } catch {}
 }

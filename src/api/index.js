@@ -74,6 +74,11 @@ export const quotationsApi = {
   delete: (data) => api.post('/quotations/delete', data),
 }
 
+// Items (unified)
+export const itemsApi = {
+  list: (params) => api.post('/items/list', params),
+}
+
 // Stats
 export const statsApi = {
   get: () => api.post('/stats'),
