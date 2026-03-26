@@ -63,7 +63,7 @@ a{text-decoration:none;color:inherit}
   padding:14px 16px;border-bottom:1px solid var(--border);
 }
 .m-card-header h3{font-size:14px;font-weight:700}
-.m-card-body{padding:14px 16px}
+.m-card-body{padding:14px 14px}
 
 /* ═══════════════ Buttons ═══════════════ */
 .btn{

@@ -12,7 +12,7 @@
     <div v-show="currentStep === 0">
       <div class="m-card">
         <div class="m-card-header"><h3>客户信息</h3></div>
-        <div class="m-card-body" style="padding:8px 16px">
+        <div class="m-card-body" style="padding:8px 14px">
           <div class="form-row full" style="margin-bottom:12px">
             <div class="form-group">
               <label>客户名称</label>
