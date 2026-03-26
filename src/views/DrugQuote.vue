@@ -54,7 +54,7 @@
             @click="selectSample(cat)"
           >
             <div class="oc-top" style="padding:10px 14px">
-              <div>
+              <div style="flex:1;min-width:0;padding-right:12px">
                 <div class="oc-customer" style="font-size:14px">{{ cat }}</div>
                 <div class="oc-id" style="margin-top:2px">{{ getCategoryItemCount(cat) }}项检测</div>
               </div>
@@ -88,7 +88,7 @@
           <div class="m-card-body" style="padding:8px 14px">
             <div v-for="sample in cartSamples" :key="sample" style="margin-bottom:8px">
               <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:4px">
-                <span style="font-weight:700;color:var(--primary);font-size:14px">{{ sample }}</span>
+                <span style="font-weight:700;color:var(--primary);font-size:14px;word-break:break-all;line-height:1.4">{{ sample }}</span>
                 <div style="display:flex;align-items:center;gap:8px">
                   <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" width="18" height="18" style="cursor:pointer" @click="openAddItemForSample(sample)">
                     <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>

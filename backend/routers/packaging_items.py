@@ -193,20 +193,23 @@ def import_items(items: list[PackagingItemCreate], db: Session = Depends(get_db)
 
 
 @router.post("/update")
-def update_item(data: PackagingItemUpdate, item_id: int = 0, db: Session = Depends(get_db), admin=Depends(require_admin)):
+def update_item(body: dict, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    item_id = body.pop("item_id", 0)
     item = db.query(PackagingItem).filter(PackagingItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="项目不存在")
-    update_data = data.model_dump(exclude_unset=True)
-    for key, val in update_data.items():
-        setattr(item, key, val)
+    allowed = {"category","name","standard","method","unit_price","cma","cnas","cycle_days","description","is_active"}
+    for key, val in body.items():
+        if key in allowed:
+            setattr(item, key, val)
     db.commit()
     db.refresh(item)
     return item_to_dict(item)
 
 
 @router.post("/delete")
-def delete_item(item_id: int = 0, db: Session = Depends(get_db), admin=Depends(require_admin)):
+def delete_item(body: dict, db: Session = Depends(get_db), admin=Depends(require_admin)):
+    item_id = body.get("item_id", 0)
     item = db.query(PackagingItem).filter(PackagingItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="项目不存在")

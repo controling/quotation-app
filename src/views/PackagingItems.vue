@@ -31,7 +31,7 @@
         </button>
         <button class="btn btn-primary btn-sm" @click="openAddDialog">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          新增
+          新增样品
         </button>
       </div>
 
@@ -47,9 +47,21 @@
             <div class="ic-name">{{ group.sample }}</div>
             <div class="ic-meta">
               <span class="badge badge-blue">{{ group.items.length }}项</span>
+              <span class="price" style="margin-left:4px">¥{{ group.totalPrice.toFixed(2) }}</span>
             </div>
           </div>
-          <div class="ic-price">¥{{ group.totalPrice.toFixed(2) }}</div>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            <button class="btn btn-sm btn-ghost" style="padding:2px 6px" @click.stop="openEditSampleName(group)" title="编辑样品名称">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button class="btn btn-sm btn-ghost" style="padding:2px 6px" @click.stop="openAddForSample(group.sample)" title="添加检测项目">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:none;padding:2px 6px" @click.stop="onDeleteSample(group.sample)" title="删除整个样品">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+            </button>
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2" width="16" height="16" :style="{ transform: expandedGroup === group.sample ? 'rotate(90deg)' : '', transition: 'transform .2s' }"><path d="M9 18l6-6-6-6"/></svg>
+          </div>
         </div>
         <div class="ic-body" v-if="expandedGroup === group.sample" style="flex-direction:column;gap:6px;padding:0 14px 12px">
           <div
@@ -70,6 +82,15 @@
               <button class="btn btn-sm btn-ghost" @click.stop="openEditDialog(item)">编辑</button>
               <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:none" @click.stop="onDelete(item)">删</button>
             </div>
+          </div>
+          <!-- Add item to this sample -->
+          <button class="btn btn-sm btn-ghost btn-block" style="margin-top:4px;border:1px dashed var(--border)" @click.stop="openAddForSample(group.sample)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            添加检测项目
+          </button>
+          <!-- Sample total -->
+          <div style="display:flex;justify-content:flex-end;padding:6px 0;font-size:13px;color:var(--text-2)">
+            样品小计: <b class="price" style="margin-left:6px">¥{{ group.totalPrice.toFixed(2) }}</b>
           </div>
         </div>
       </div>
@@ -111,6 +132,14 @@
         <van-field v-model="formData.description" label="备注" placeholder="可选" />
       </div>
     </van-dialog>
+
+    <!-- Edit Sample Name Dialog -->
+    <van-dialog v-model:show="showSampleEditDialog" title="修改样品名称" show-cancel-button @confirm="onSaveSampleName">
+      <div style="padding: 12px 16px">
+        <van-field v-model="newSampleName" label="新名称" placeholder="请输入新的样品名称" />
+        <div style="font-size:12px;color:var(--text-3);padding:0 16px">将同步更新该样品下 {{ editingSampleItems.length }} 项检测项目的分类</div>
+      </div>
+    </van-dialog>
   </div>
 </template>
 
@@ -137,6 +166,11 @@ const loadingMore = ref(false)
 const apiCategories = ref([])
 const categoriesByMajor = ref({})
 const showBackTop = ref(false)
+// Edit sample name state
+const showSampleEditDialog = ref(false)
+const editingSampleName = ref('')
+const editingSampleItems = ref([])
+const newSampleName = ref('')
 // API search state
 const searchActive = ref(false)
 const searchGroups = ref([])
@@ -262,13 +296,43 @@ function onSearch() {
 }
 
 function onExport() {
-  exportItems(filteredItems.value, '药包材检测项目')
+  exportItems(filteredGroups.value.flatMap(g => g.items), '药包材检测项目')
 }
 
 function openAddDialog() {
   editingItem.value = null
   formData.value = getEmptyForm()
   showDialog.value = true
+}
+
+function openAddForSample(sampleName) {
+  editingItem.value = null
+  formData.value = { ...getEmptyForm(), category: sampleName }
+  showDialog.value = true
+}
+
+function openEditSampleName(group) {
+  editingSampleName.value = group.sample
+  editingSampleItems.value = group.items
+  newSampleName.value = group.sample
+  showSampleEditDialog.value = true
+}
+
+async function onSaveSampleName() {
+  const oldName = editingSampleName.value
+  const name = newSampleName.value.trim()
+  if (!name || name === oldName) return
+  try {
+    const items = editingSampleItems.value
+    for (const item of items) {
+      await packagingItemsApi.update({ item_id: item.id, category: name })
+    }
+    toast(`已将「${oldName}」更名为「${name}」`)
+    store.loaded = false
+    store.loadAll()
+  } catch (e) {
+    toast('重命名失败: ' + (e.response?.data?.detail || e.message || ''))
+  }
 }
 
 function openEditDialog(item) {
@@ -315,6 +379,25 @@ function onDelete(item) {
         toast('删除失败: ' + (e.response?.data?.detail || e.message || ''))
       }
     }).catch(() => {})
+}
+
+function onDeleteSample(sampleName) {
+  const items = store.items.filter(i => i.category === sampleName)
+  showConfirmDialog({
+    title: '删除样品',
+    message: `确定删除样品「${sampleName}」及其 ${items.length} 项检测项目吗？`
+  }).then(async () => {
+    try {
+      for (const item of items) {
+        await packagingItemsApi.delete({ item_id: item.id })
+      }
+      toast(`已删除样品「${sampleName}」`)
+      store.loaded = false
+      store.loadAll()
+    } catch (e) {
+      toast('删除失败: ' + (e.response?.data?.detail || e.message || ''))
+    }
+  }).catch(() => {})
 }
 
 async function onImport(items) {
