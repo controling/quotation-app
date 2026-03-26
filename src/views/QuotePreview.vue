@@ -87,52 +87,42 @@
           <span style="font-size:12px;color:var(--text-3)">{{ editForm.items.length }}项</span>
         </div>
         <div class="m-card-body" style="padding:8px 14px">
-          <!-- Inline search -->
-          <div class="m-search-bar" style="height:36px;margin-bottom:8px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" placeholder="搜索添加检测项目..." v-model="editSearchText" @input="onEditSearch" @focus="showEditSearch = true" />
-          </div>
-          <!-- Search suggestions -->
-          <div v-if="showEditSearch && editSearchResults.length > 0" class="edit-search-dropdown">
-            <div v-for="item in editSearchResults" :key="item.id" class="edit-search-item" @click="addSingleItem(item)">
-              <div>
-                <span style="font-weight:500">{{ item.name }}</span>
-                <span style="font-size:11px;color:var(--text-3);margin-left:6px">{{ item.category }}</span>
-              </div>
+          <div v-for="sample in editSampleGroups" :key="sample.name" style="margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:4px">
+              <span style="font-weight:700;color:var(--primary);font-size:14px">{{ sample.name }}</span>
               <div style="display:flex;align-items:center;gap:8px">
-                <span class="price" style="font-size:13px">¥{{ item.unit_price }}</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" width="18" height="18"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" width="18" height="18" style="cursor:pointer" @click="openAddItemForSample(sample.name)">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" width="18" height="18" style="cursor:pointer" @click="removeEditSample(sample.name)">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                </svg>
+              </div>
+            </div>
+            <div v-for="item in sample.items" :key="item.id" class="cart-item">
+              <div class="cart-item-info" style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span class="cart-item-name">{{ item.name }}</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" width="14" height="14" style="cursor:pointer;flex-shrink:0;opacity:.6" @click="removeEditItem(item.id)">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </div>
+                <div class="cart-item-meta">{{ item.method || '-' }} · {{ item.cycle_days || '-' }}天</div>
+              </div>
+              <div class="cart-item-right">
+                <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
+                  <span style="font-size:11px;color:var(--text-3)">单价</span>
+                  <input class="form-input" type="number" v-model.number="item.unit_price" style="width:70px;height:28px;font-size:13px;text-align:right;padding:0 6px" />
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <van-stepper v-model="item.quantity" :min="1" :max="99" theme="round" button-size="20" />
+                  <span class="price" style="min-width:65px;text-align:right">¥{{ (item.unit_price * item.quantity).toFixed(2) }}</span>
+                </div>
               </div>
             </div>
           </div>
-          <!-- Sample filter pills -->
-          <div class="filter-pills" style="margin-bottom:8px" v-if="editSampleCats.length > 1">
-            <div class="filter-pill" :class="{ active: editFilterCat === '' }" @click="editFilterCat = ''">全部</div>
-            <div class="filter-pill" v-for="cat in editSampleCats" :key="cat" :class="{ active: editFilterCat === cat }" @click="editFilterCat = cat">{{ cat }}</div>
-          </div>
-          <!-- Item list -->
-          <div v-for="(item, index) in editFilteredItems" :key="item.id || index" class="edit-item-row">
-            <div class="edit-item-left">
-              <div class="edit-item-name">{{ item.name }}</div>
-              <div class="edit-item-meta">{{ item.method || '-' }} · {{ item.cycle_days || '-' }}天</div>
-            </div>
-            <div class="edit-item-center">
-              <input class="form-input" type="number" v-model.number="item.unit_price" style="width:70px;height:32px;font-size:13px;text-align:right" />
-              <span style="color:var(--text-3)">×</span>
-              <input class="form-input" type="number" v-model.number="item.quantity" style="width:48px;height:32px;font-size:13px;text-align:center" />
-            </div>
-            <div class="edit-item-right">
-              <span class="price" style="font-size:13px">¥{{ (item.unit_price * item.quantity).toFixed(2) }}</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" width="16" height="16" style="cursor:pointer" @click="removeEditItem(item)">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </div>
-          </div>
-          <div v-if="editFilteredItems.length === 0" style="text-align:center;padding:16px;color:var(--text-3);font-size:13px">
-            {{ editFilterCat ? '该样品下暂无项目' : '暂无检测项目，请搜索添加' }}
-          </div>
-          <!-- Add more -->
-          <button class="btn btn-ghost btn-sm btn-block" style="margin-top:8px" @click="showSamplePicker = true">从样品列表添加</button>
+          <div v-if="editForm.items.length === 0" style="text-align:center;padding:16px;color:var(--text-3);font-size:13px">暂无检测项目，请点击下方添加</div>
+          <button class="btn btn-ghost btn-sm btn-block" style="margin-top:8px" @click="openAddItemForSample('')">+ 添加检测项目</button>
         </div>
       </div>
 
@@ -164,107 +154,44 @@
       </div>
     </div>
 
-    <!-- Sample picker popup -->
-    <van-popup v-model:show="showSamplePicker" position="bottom" round :style="{ maxHeight: '80%' }">
+    <!-- Cart add item popup -->
+    <van-popup v-model:show="showCartAddPopup" position="bottom" round :style="{ maxHeight: '85%' }">
       <div class="popup-wrap">
         <div class="popup-header">
-          <h3>选择样品</h3>
-          <div class="sheet-close" @click="showSamplePicker = false">
+          <div>
+            <h3>添加检测项目</h3>
+            <span class="popup-sub">共 {{ cartAddItems.length }} 项可添加</span>
+          </div>
+          <div class="sheet-close" @click="showCartAddPopup = false">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </div>
         </div>
-        <div style="padding:8px 16px">
-          <div class="m-search-bar" style="height:38px">
+        <div style="padding:0 14px 8px">
+          <div class="m-search-bar" style="height:36px">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" placeholder="搜索样品..." v-model="sampleSearchText" />
-          </div>
-        </div>
-        <div class="popup-items">
-          <div
-            v-for="cat in filteredSampleList"
-            :key="cat"
-            class="order-card"
-            style="margin:0 16px 6px;cursor:pointer"
-            @click="showSampleItems(cat)"
-          >
-            <div class="oc-top" style="padding:10px 14px">
-              <div>
-                <div class="oc-customer" style="font-size:14px">{{ cat }}</div>
-                <div class="oc-id" style="margin-top:2px">{{ getSampleItemCount(cat) }}项</div>
-              </div>
-              <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2" width="16" height="16"><path d="M9 18l6-6-6-6"/></svg>
-            </div>
-          </div>
-        </div>
-      </div>
-    </van-popup>
-
-    <!-- Sample items popup -->
-    <van-popup v-model:show="showSampleItemsPopup" position="bottom" round :style="{ maxHeight: '80%' }">
-      <div class="popup-wrap" v-if="currentSample">
-        <div class="popup-header">
-          <div><h3>{{ currentSample }}</h3><span class="popup-sub">{{ currentSampleItems.length }}项</span></div>
-          <div class="sheet-close" @click="showSampleItemsPopup = false">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <input type="text" placeholder="搜索项目名称或样品..." v-model="cartAddSearch" @input="onCartAddSearch" />
           </div>
         </div>
         <div class="popup-actions">
-          <button class="btn btn-sm btn-primary" @click="addSampleItems">全部加入</button>
+          <button class="btn btn-sm btn-ghost" @click="selectedEditIds = new Set(cartAddItems.map(i => i.id))">全选</button>
+          <button class="btn btn-sm btn-ghost" @click="selectedEditIds = new Set()">取消全选</button>
+          <button class="btn btn-sm btn-primary" @click="addItemsToEdit">加入 ({{ selectedEditIds.size }})</button>
         </div>
         <div class="popup-items">
-          <div
-            v-for="item in currentSampleItems"
-            :key="item.id"
-            class="order-card"
-            style="margin:0 16px 6px;cursor:pointer"
-            @click="addSingleItem(item)"
-          >
-            <div class="oc-top" style="padding:10px 14px">
-              <div>
-                <div class="oc-customer" style="font-size:14px">{{ item.name }}</div>
-                <div class="oc-id" style="margin-top:2px">{{ item.method || '-' }}</div>
-              </div>
-              <span class="price">¥{{ item.unit_price }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </van-popup>
-
-    <!-- Search popup -->
-    <van-popup v-model:show="showSearch" position="bottom" round :style="{ maxHeight: '80%' }">
-      <div class="popup-wrap">
-        <div class="popup-header">
-          <h3>搜索添加</h3>
-          <div class="sheet-close" @click="showSearch = false">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </div>
-        </div>
-        <div style="padding:8px 16px">
-          <div class="m-search-bar" style="height:38px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" placeholder="搜索项目名称..." v-model="searchText" />
-          </div>
-        </div>
-        <div class="popup-items">
-          <div
-            v-for="item in searchResults"
-            :key="item.id"
-            class="order-card"
-            style="margin:0 16px 6px;cursor:pointer"
-            @click="addSingleItem(item)"
-          >
-            <div class="oc-top" style="padding:10px 14px">
-              <div>
-                <div class="oc-customer" style="font-size:14px">{{ item.name }}</div>
-                <div class="oc-id" style="margin-top:2px">{{ item.category }} | ¥{{ item.unit_price }}</div>
-              </div>
-              <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" width="20" height="20"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            </div>
-          </div>
-          <div v-if="searchText && searchResults.length === 0" class="empty-state" style="padding:24px">
-            <p>未找到匹配项</p>
-          </div>
+          <van-checkbox-group v-model="selectedEditIdsArr">
+            <van-cell v-for="item in cartAddItems" :key="item.id" clickable @click="toggleEditItem(item.id)">
+              <template #title>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <van-checkbox :name="item.id" @click.stop />
+                  <div>
+                    <div style="font-weight:500">{{ item.name }}</div>
+                    <div style="font-size:12px;color:var(--text-3)">{{ item.category }} | {{ item.method || '-' }}</div>
+                  </div>
+                </div>
+              </template>
+              <template #value><span class="price">¥{{ item.unit_price }}</span></template>
+            </van-cell>
+          </van-checkbox-group>
         </div>
       </div>
     </van-popup>
@@ -279,7 +206,7 @@ import { showConfirmDialog } from 'vant'
 import { useQuotationsStore } from '../stores/quotations'
 import { useDrugItemsStore } from '../stores/drugItems'
 import { usePackagingItemsStore } from '../stores/packagingItems'
-import { quotationsApi } from '../api'
+import { quotationsApi, itemsApi } from '../api'
 import { exportQuotation } from '../utils/excel'
 
 const route = useRoute()
@@ -295,40 +222,73 @@ const editForm = ref({ customer_name: '', contact_person: '', items: [] })
 
 const showSearch = ref(false)
 const searchText = ref('')
-const showSamplePicker = ref(false)
-const sampleSearchText = ref('')
-const showSampleItemsPopup = ref(false)
-const currentSample = ref('')
 
-// Edit mode enhancements
-const editSearchText = ref('')
-const showEditSearch = ref(false)
-const editSearchResults = ref([])
-const editFilterCat = ref('')
-let editSearchTimer = null
+// Edit mode
+const showCartAddPopup = ref(false)
+const cartAddSample = ref('')
+const cartAddSearch = ref('')
+const cartAddItems = ref([])
+const selectedEditIds = ref(new Set())
+const selectedEditIdsArr = computed({
+  get: () => Array.from(selectedEditIds.value),
+  set: (v) => { selectedEditIds.value = new Set(v) }
+})
+let cartAddTimer = null
 
-const editSampleCats = computed(() => [...new Set(editForm.value.items.map(i => i.category).filter(Boolean))])
-const editFilteredItems = computed(() => {
-  if (editFilterCat.value) return editForm.value.items.filter(i => i.category === editFilterCat.value)
-  return editForm.value.items
+const editSampleGroups = computed(() => {
+  const map = {}
+  editForm.value.items.forEach(item => {
+    const cat = item.category || '未分类'
+    if (!map[cat]) map[cat] = { name: cat, items: [] }
+    map[cat].items.push(item)
+  })
+  return Object.values(map)
 })
 
-function onEditSearch() {
-  clearTimeout(editSearchTimer)
-  const q = editSearchText.value.trim()
-  if (!q) { editSearchResults.value = []; return }
-  editSearchTimer = setTimeout(async () => {
-    const store = itemStore.value
-    editSearchResults.value = store.items.filter(i =>
-      i.name.toLowerCase().includes(q.toLowerCase()) ||
-      (i.category || '').toLowerCase().includes(q.toLowerCase())
-    ).slice(0, 8)
-  }, 200)
+function removeEditItem(id) {
+  editForm.value.items = editForm.value.items.filter(i => i.id !== id)
+}
+function removeEditSample(name) {
+  editForm.value.items = editForm.value.items.filter(i => i.category !== name)
 }
 
-function removeEditItem(item) {
-  const idx = editForm.value.items.findIndex(i => i.id === item.id)
-  if (idx >= 0) editForm.value.items.splice(idx, 1)
+function openAddItemForSample(sample) {
+  cartAddSample.value = sample
+  selectedEditIds.value = new Set()
+  cartAddSearch.value = ''
+  cartAddItems.value = []
+  showCartAddPopup.value = true
+  loadCartAddItems()
+}
+async function loadCartAddItems() {
+  try {
+    const itemType = quotation.value?.type === 'packaging' ? 'packaging' : 'drug'
+    const { data } = await itemsApi.list({ type: itemType, search: cartAddSearch.value, page: 1, page_size: 50 })
+    const existingIds = new Set(editForm.value.items.map(i => i.id))
+    cartAddItems.value = (data.items || []).filter(i => !existingIds.has(i.id))
+  } catch {}
+}
+function onCartAddSearch() {
+  clearTimeout(cartAddTimer)
+  cartAddTimer = setTimeout(() => loadCartAddItems(), 300)
+}
+function addItemsToEdit() {
+  const targetSample = cartAddSample.value
+  const items = cartAddItems.value.filter(i => selectedEditIds.value.has(i.id))
+  let added = 0
+  for (const item of items) {
+    if (!editForm.value.items.find(c => c.id === item.id)) {
+      editForm.value.items.push({ id: item.id, name: item.name, category: targetSample || item.category, standard: item.standard, method: item.method, unit_price: item.unit_price, quantity: 1, cma: item.cma, cnas: item.cnas, cycle_days: item.cycle_days, description: item.description })
+      added++
+    }
+  }
+  showCartAddPopup.value = false
+  if (added) toast(`已添加 ${added} 项`)
+}
+function toggleEditItem(id) {
+  if (selectedEditIds.value.has(id)) selectedEditIds.value.delete(id)
+  else selectedEditIds.value.add(id)
+  selectedEditIds.value = new Set(selectedEditIds.value)
 }
 
 onMounted(async () => {
@@ -355,65 +315,13 @@ const groupedItems = computed(() => {
 
 const editTotal = computed(() => editForm.value.items.reduce((sum, i) => sum + (i.unit_price * i.quantity), 0))
 
-const itemStore = computed(() => quotation.value?.type === 'packaging' ? packagingStore : drugStore)
-const filteredSampleList = computed(() => {
-  const cats = itemStore.value.categories
-  if (!sampleSearchText.value) return cats
-  return cats.filter(c => c.toLowerCase().includes(sampleSearchText.value.toLowerCase()))
-})
-function getSampleItemCount(cat) { return itemStore.value.items.filter(i => i.category === cat).length }
-
-const currentSampleItems = computed(() => itemStore.value.items.filter(i => i.category === currentSample.value))
-
-const searchResults = computed(() => {
-  if (!searchText.value) return []
-  const q = searchText.value.toLowerCase()
-  return itemStore.value.items.filter(i => i.name.toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q)).slice(0, 30)
-})
-
-function showSampleItems(cat) {
-  currentSample.value = cat
-  showSamplePicker.value = false
-  showSampleItemsPopup.value = true
-}
-
-function addSampleItems() {
-  let added = 0
-  currentSampleItems.value.forEach(item => {
-    if (!editForm.value.items.find(i => i.id === item.id)) {
-      editForm.value.items.push({ id: item.id, name: item.name, category: item.category, standard: item.standard, method: item.method, unit_price: item.unit_price, quantity: 1, cma: item.cma, cnas: item.cnas, cycle_days: item.cycle_days, description: item.description })
-      added++
-    }
-  })
-  showSampleItemsPopup.value = false
-  toast(`已添加 ${added} 项`)
-}
-
-function addSingleItem(item) {
-  const exists = editForm.value.items.find(i => i.id === item.id)
-  if (exists) { exists.quantity += 1 }
-  else {
-    editForm.value.items.push({ id: item.id, name: item.name, category: item.category, standard: item.standard, method: item.method, unit_price: item.unit_price, quantity: 1, cma: item.cma, cnas: item.cnas, cycle_days: item.cycle_days, description: item.description })
-  }
-  showSearch.value = false
-  showSampleItemsPopup.value = false
-  showEditSearch.value = false
-  editSearchText.value = ''
-  editSearchResults.value = []
-  toast(`已添加: ${item.name}`)
-}
-
-function removeItem(index) { editForm.value.items.splice(index, 1) }
-
 function startEdit() {
   editForm.value = {
     customer_name: quotation.value.customer_name || '',
     contact_person: quotation.value.contact_person || '',
     items: quotation.value.items.map(i => ({ ...i }))
   }
-  editFilterCat.value = ''
-  editSearchText.value = ''
-  showEditSearch.value = false
+  showCartAddPopup.value = false
   editing.value = true
 }
 function cancelEdit() { editing.value = false }
