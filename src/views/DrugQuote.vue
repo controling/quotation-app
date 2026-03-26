@@ -116,6 +116,7 @@
           <span style="font-size:15px">合计: <b class="price" style="font-size:20px">¥{{ cartTotal.toFixed(2) }}</b></span>
           <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:none" @click="clearCart">清空</button>
         </div>
+        <button class="btn btn-ghost btn-sm btn-block" style="margin-top:8px" @click="currentStep = 1">+ 添加样品</button>
       </div>
       <div v-else class="empty-state">
         <h3>购物车为空</h3>
@@ -173,30 +174,36 @@
 
     <!-- Cart add item popup -->
     <van-popup v-model:show="showCartAddPopup" position="bottom" round :style="{ maxHeight: '85%' }">
-      <div class="popup-wrap" v-if="cartAddSample">
+      <div class="popup-wrap">
         <div class="popup-header">
           <div>
-            <h3>添加项目到「{{ cartAddSample }}」</h3>
-            <span class="popup-sub">{{ cartAddAvailable.length }}项可添加</span>
+            <h3>添加检测项目</h3>
+            <span class="popup-sub">共 {{ cartAddFilteredItems.length }} 项可添加</span>
           </div>
           <div class="sheet-close" @click="showCartAddPopup = false">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </div>
         </div>
+        <div style="padding:0 14px 8px">
+          <div class="m-search-bar" style="height:36px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" placeholder="搜索项目名称或样品..." v-model="cartAddSearch" />
+          </div>
+        </div>
         <div class="popup-actions">
-          <button class="btn btn-sm btn-ghost" @click="selectedIds = new Set(cartAddAvailable.map(i => i.id))">全选</button>
+          <button class="btn btn-sm btn-ghost" @click="selectedIds = new Set(cartAddFilteredItems.map(i => i.id))">全选</button>
           <button class="btn btn-sm btn-ghost" @click="selectedIds = new Set()">取消全选</button>
           <button class="btn btn-sm btn-primary" @click="addItemsToCartSample">加入 ({{ selectedIds.size }})</button>
         </div>
         <div class="popup-items">
           <van-checkbox-group v-model="selectedIdsArr">
-            <van-cell v-for="item in cartAddAvailable" :key="item.id" clickable @click="toggleItem(item.id)">
+            <van-cell v-for="item in cartAddFilteredItems" :key="item.id" clickable @click="toggleItem(item.id)">
               <template #title>
                 <div style="display:flex;align-items:center;gap:8px">
                   <van-checkbox :name="item.id" @click.stop />
                   <div>
                     <div style="font-weight:500">{{ item.name }}</div>
-                    <div style="font-size:12px;color:var(--text-3)">{{ item.method || '-' }} | {{ item.cycle_days }}天</div>
+                    <div style="font-size:12px;color:var(--text-3)">{{ item.category }} | {{ item.method || '-' }}</div>
                   </div>
                 </div>
               </template>
@@ -371,12 +378,21 @@ function clearCart() { cart.value = [] }
 function openAddItemForSample(sample) {
   cartAddSample.value = sample
   selectedIds.value = new Set()
+  cartAddSearch.value = ''
   showCartAddPopup.value = true
 }
-const cartAddSampleItems = computed(() => store.items.filter(i => i.category === cartAddSample.value))
-const cartAddAvailable = computed(() => cartAddSampleItems.value.filter(i => !cart.value.find(c => c.id === i.id)))
+const cartAddSearch = ref('')
+const cartAddFilteredItems = computed(() => {
+  const existingIds = new Set(cart.value.map(i => i.id))
+  let items = store.items.filter(i => !existingIds.has(i.id))
+  if (cartAddSearch.value) {
+    const q = cartAddSearch.value.toLowerCase()
+    items = items.filter(i => i.name.toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q))
+  }
+  return items.slice(0, 100)
+})
 function addItemsToCartSample() {
-  const items = cartAddSampleItems.value.filter(i => selectedIds.value.has(i.id))
+  const items = store.items.filter(i => selectedIds.value.has(i.id))
   let added = 0
   for (const item of items) {
     if (!cart.value.find(c => c.id === item.id)) {
