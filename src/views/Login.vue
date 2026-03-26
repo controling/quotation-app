@@ -57,8 +57,6 @@
             <span v-else>登录中...</span>
             <svg v-if="!loading" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </button>
-
-          <div class="login-tip">演示账号：admin / 20231102</div>
         </div>
       </div>
     </div>

@@ -11,7 +11,7 @@
       </div>
 
       <!-- Filter Pills -->
-      <div class="filter-pills">
+      <!-- <div class="filter-pills">
         <div class="filter-pill" :class="{ active: activeCategory === '' }" @click="activeCategory = ''">全部</div>
         <div
           class="filter-pill"
@@ -20,12 +20,12 @@
           :class="{ active: activeCategory === cat }"
           @click="activeCategory = cat"
         >{{ cat }}</div>
-      </div>
+      </div> -->
 
       <!-- Actions -->
       <div class="action-header">
         <ImportExcel buttonText="从Excel导入" @imported="onImport" />
-        <button class="btn btn-ghost btn-sm" @click="onExport">
+        <button class="btn btn-primary btn-sm" @click="onExport">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           导出
         </button>
@@ -163,7 +163,7 @@ const loadedPages = ref(1)
 const totalDrugItems = ref(0)
 const totalSamples = ref(0)
 const loadingMore = ref(false)
-const apiCategories = ref([])
+// const apiCategories = ref([])
 const showBackTop = ref(false)
 // Edit sample name state
 const showSampleEditDialog = ref(false)
@@ -184,16 +184,16 @@ function getEmptyForm() {
 onMounted(async () => {
   store.loadAll()
   // Load categories from API - extract major category prefix
-  try {
-    const res = await drugItemsApi.categories()
-    const cats = res.data || []
-    const prefixes = new Set()
-    cats.forEach(c => {
-      const prefix = c.split('-')[0]
-      if (prefix && prefix.trim()) prefixes.add(prefix.trim())
-    })
-    apiCategories.value = [...prefixes].sort()
-  } catch {}
+  // try {
+  //   const res = await drugItemsApi.categories()
+  //   const cats = res.data || []
+  //   const prefixes = new Set()
+  //   cats.forEach(c => {
+  //     const prefix = c.split('-')[0]
+  //     if (prefix && prefix.trim()) prefixes.add(prefix.trim())
+  //   })
+  //   apiCategories.value = [...prefixes].sort()
+  // } catch {}
   // Load stats
   try {
     const res = await statsApi.get()
