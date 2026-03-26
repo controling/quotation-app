@@ -82,34 +82,57 @@
 
       <!-- Items - edit mode -->
       <div class="m-card" v-if="editing">
-        <div class="m-card-header"><h3>检测项目明细</h3></div>
+        <div class="m-card-header">
+          <h3>检测项目明细</h3>
+          <span style="font-size:12px;color:var(--text-3)">{{ editForm.items.length }}项</span>
+        </div>
         <div class="m-card-body" style="padding:8px 14px">
-          <div v-for="(item, index) in editForm.items" :key="index" class="edit-item-card">
-            <div class="edit-item-header">
+          <!-- Inline search -->
+          <div class="m-search-bar" style="height:36px;margin-bottom:8px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" placeholder="搜索添加检测项目..." v-model="editSearchText" @input="onEditSearch" @focus="showEditSearch = true" />
+          </div>
+          <!-- Search suggestions -->
+          <div v-if="showEditSearch && editSearchResults.length > 0" class="edit-search-dropdown">
+            <div v-for="item in editSearchResults" :key="item.id" class="edit-search-item" @click="addSingleItem(item)">
               <div>
-                <span class="edit-item-category" v-if="item.category">{{ item.category }}</span>
-                <span class="edit-item-name">{{ item.name }}</span>
+                <span style="font-weight:500">{{ item.name }}</span>
+                <span style="font-size:11px;color:var(--text-3);margin-left:6px">{{ item.category }}</span>
               </div>
-              <svg viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" width="18" height="18" style="cursor:pointer;flex-shrink:0" @click="removeItem(index)">
-                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="price" style="font-size:13px">¥{{ item.unit_price }}</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" width="18" height="18"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </div>
+            </div>
+          </div>
+          <!-- Sample filter pills -->
+          <div class="filter-pills" style="margin-bottom:8px" v-if="editSampleCats.length > 1">
+            <div class="filter-pill" :class="{ active: editFilterCat === '' }" @click="editFilterCat = ''">全部</div>
+            <div class="filter-pill" v-for="cat in editSampleCats" :key="cat" :class="{ active: editFilterCat === cat }" @click="editFilterCat = cat">{{ cat }}</div>
+          </div>
+          <!-- Item list -->
+          <div v-for="(item, index) in editFilteredItems" :key="item.id || index" class="edit-item-row">
+            <div class="edit-item-left">
+              <div class="edit-item-name">{{ item.name }}</div>
+              <div class="edit-item-meta">{{ item.method || '-' }} · {{ item.cycle_days || '-' }}天</div>
+            </div>
+            <div class="edit-item-center">
+              <input class="form-input" type="number" v-model.number="item.unit_price" style="width:70px;height:32px;font-size:13px;text-align:right" />
+              <span style="color:var(--text-3)">×</span>
+              <input class="form-input" type="number" v-model.number="item.quantity" style="width:48px;height:32px;font-size:13px;text-align:center" />
+            </div>
+            <div class="edit-item-right">
+              <span class="price" style="font-size:13px">¥{{ (item.unit_price * item.quantity).toFixed(2) }}</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" width="16" height="16" style="cursor:pointer" @click="removeEditItem(item)">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
               </svg>
             </div>
-            <div class="edit-item-fields">
-              <div style="flex:1">
-                <label style="font-size:11px;color:var(--text-3)">单价</label>
-                <input class="form-input" type="number" v-model.number="item.unit_price" style="height:36px;font-size:13px" />
-              </div>
-              <div style="flex:1">
-                <label style="font-size:11px;color:var(--text-3)">数量</label>
-                <input class="form-input" type="number" v-model.number="item.quantity" style="height:36px;font-size:13px" />
-              </div>
-              <div class="edit-item-subtotal">¥{{ (item.unit_price * item.quantity).toFixed(2) }}</div>
-            </div>
           </div>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button class="btn btn-ghost btn-sm" style="flex:1" @click="showSamplePicker = true">+ 添加样品</button>
-            <button class="btn btn-primary btn-sm" style="flex:1" @click="showSearch = true">🔍 搜索项目</button>
+          <div v-if="editFilteredItems.length === 0" style="text-align:center;padding:16px;color:var(--text-3);font-size:13px">
+            {{ editFilterCat ? '该样品下暂无项目' : '暂无检测项目，请搜索添加' }}
           </div>
+          <!-- Add more -->
+          <button class="btn btn-ghost btn-sm btn-block" style="margin-top:8px" @click="showSamplePicker = true">从样品列表添加</button>
         </div>
       </div>
 
@@ -277,6 +300,37 @@ const sampleSearchText = ref('')
 const showSampleItemsPopup = ref(false)
 const currentSample = ref('')
 
+// Edit mode enhancements
+const editSearchText = ref('')
+const showEditSearch = ref(false)
+const editSearchResults = ref([])
+const editFilterCat = ref('')
+let editSearchTimer = null
+
+const editSampleCats = computed(() => [...new Set(editForm.value.items.map(i => i.category).filter(Boolean))])
+const editFilteredItems = computed(() => {
+  if (editFilterCat.value) return editForm.value.items.filter(i => i.category === editFilterCat.value)
+  return editForm.value.items
+})
+
+function onEditSearch() {
+  clearTimeout(editSearchTimer)
+  const q = editSearchText.value.trim()
+  if (!q) { editSearchResults.value = []; return }
+  editSearchTimer = setTimeout(async () => {
+    const store = itemStore.value
+    editSearchResults.value = store.items.filter(i =>
+      i.name.toLowerCase().includes(q.toLowerCase()) ||
+      (i.category || '').toLowerCase().includes(q.toLowerCase())
+    ).slice(0, 8)
+  }, 200)
+}
+
+function removeEditItem(item) {
+  const idx = editForm.value.items.findIndex(i => i.id === item.id)
+  if (idx >= 0) editForm.value.items.splice(idx, 1)
+}
+
 onMounted(async () => {
   const id = Number(route.params.id)
   quotation.value = quoteStore.getQuotation(id)
@@ -343,6 +397,9 @@ function addSingleItem(item) {
   }
   showSearch.value = false
   showSampleItemsPopup.value = false
+  showEditSearch.value = false
+  editSearchText.value = ''
+  editSearchResults.value = []
   toast(`已添加: ${item.name}`)
 }
 
@@ -354,6 +411,9 @@ function startEdit() {
     contact_person: quotation.value.contact_person || '',
     items: quotation.value.items.map(i => ({ ...i }))
   }
+  editFilterCat.value = ''
+  editSearchText.value = ''
+  showEditSearch.value = false
   editing.value = true
 }
 function cancelEdit() { editing.value = false }
@@ -413,3 +473,58 @@ function onDelete() {
     }).catch(() => {})
 }
 </script>
+
+<style scoped>
+.edit-search-dropdown {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  box-shadow: 0 4px 16px rgba(0,0,0,.1);
+}
+.edit-search-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.edit-search-item:last-child { border-bottom: none; }
+.edit-search-item:active { background: var(--bg); }
+
+.edit-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f5f5f7;
+}
+.edit-item-row:last-child { border-bottom: none; }
+.edit-item-left { flex: 1; min-width: 0; }
+.edit-item-name { font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.edit-item-meta { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.edit-item-center { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.edit-item-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; min-width: 70px; justify-content: flex-end; }
+
+.filter-pills { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.filter-pill {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--bg);
+  color: var(--text-2);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all .15s;
+}
+.filter-pill.active {
+  background: var(--primary-light, #eef1ff);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+</style>

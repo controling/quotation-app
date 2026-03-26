@@ -86,13 +86,24 @@
             </svg>
           </div>
           <div v-for="item in getCartItemsBySample(sample)" :key="item.id" class="cart-item">
-            <div class="cart-item-info">
-              <span class="cart-item-name">{{ item.name }}</span>
-              <span class="cart-item-meta">{{ item.method || '-' }}</span>
+            <div class="cart-item-info" style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="cart-item-name">{{ item.name }}</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" width="14" height="14" style="cursor:pointer;flex-shrink:0;opacity:.6" @click="removeItemFromCart(item.id)">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </div>
+              <div class="cart-item-meta">{{ item.method || '-' }}</div>
             </div>
             <div class="cart-item-right">
-              <van-stepper v-model="item.quantity" :min="1" :max="99" theme="round" button-size="20" />
-              <span class="price" style="min-width:70px;text-align:right">¥{{ item.unit_price * item.quantity }}</span>
+              <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
+                <span style="font-size:11px;color:var(--text-3)">单价</span>
+                <input class="form-input" type="number" v-model.number="item.unit_price" style="width:70px;height:28px;font-size:13px;text-align:right;padding:0 6px" />
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <van-stepper v-model="item.quantity" :min="1" :max="99" theme="round" button-size="20" />
+                <span class="price" style="min-width:65px;text-align:right">¥{{ item.unit_price * item.quantity }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -295,6 +306,7 @@ function addSelectedToCart() {
 const cartSamples = computed(() => [...new Set(cart.value.map(i => i.category))])
 function getCartItemsBySample(sample) { return cart.value.filter(i => i.category === sample) }
 function removeSampleFromCart(sample) { cart.value = cart.value.filter(i => i.category !== sample) }
+function removeItemFromCart(id) { cart.value = cart.value.filter(i => i.id !== id) }
 function clearCart() { cart.value = [] }
 const cartTotal = computed(() => cart.value.reduce((sum, i) => sum + i.unit_price * i.quantity, 0))
 function goStep(i) { if (i <= currentStep.value) currentStep.value = i }
