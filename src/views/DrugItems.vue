@@ -136,6 +136,10 @@ const totalSamples = ref(0)
 const loadingMore = ref(false)
 const apiCategories = ref([])
 const showBackTop = ref(false)
+// API search state
+const searchActive = ref(false)
+const searchGroups = ref([])
+let searchTimer = null
 let scrollContainer = null
 let lastLoadedHeight = 0
 
@@ -207,27 +211,15 @@ async function loadMore() {
   }
 }
 
-const filteredItems = computed(() => {
+const filteredGroups = computed(() => {
+  if (searchActive.value) return searchGroups.value
   let result = store.items
   if (activeCategory.value) {
-    // Match by prefix: "中药饮片" matches "中药饮片-丁香", "中药饮片-丹参", etc.
     const prefix = activeCategory.value + '-'
     result = result.filter(i => i.category && (i.category === activeCategory.value || i.category.startsWith(prefix)))
   }
-  if (searchText.value) {
-    const q = searchText.value.toLowerCase()
-    result = result.filter(i =>
-      (i.name || '').toLowerCase().includes(q) ||
-      (i.category || '').toLowerCase().includes(q) ||
-      (i.standard || '').toLowerCase().includes(q)
-    )
-  }
-  return result
-})
-
-const filteredGroups = computed(() => {
   const map = {}
-  filteredItems.value.forEach(item => {
+  result.forEach(item => {
     const sample = item.category || '未分类'
     if (!map[sample]) map[sample] = { sample, items: [], totalPrice: 0 }
     map[sample].items.push(item)
@@ -236,12 +228,38 @@ const filteredGroups = computed(() => {
   return Object.values(map).sort((a, b) => a.sample.localeCompare(b.sample, 'zh'))
 })
 
-const hasMore = computed(() => store.loaded && store.totalSamples > 0 && filteredGroups.value.length < store.totalSamples)
+const hasMore = computed(() => !searchActive.value && store.loaded && store.totalSamples > 0 && filteredGroups.value.length < store.totalSamples)
 
 function toggleGroup(sample) {
   expandedGroup.value = expandedGroup.value === sample ? '' : sample
 }
-function onSearch() { expandedGroup.value = '' }
+function onSearch() {
+  expandedGroup.value = ''
+  clearTimeout(searchTimer)
+  const q = searchText.value.trim()
+  if (!q) {
+    searchActive.value = false
+    searchGroups.value = []
+    return
+  }
+  searchTimer = setTimeout(async () => {
+    try {
+      const { data } = await drugItemsApi.list({ search: q, page: 1, page_size: 100 })
+      const map = {}
+      for (const sample of (data.samples || [])) {
+        for (const item of sample.items) {
+          if (!map[sample.category]) map[sample.category] = { sample: sample.category, items: [], totalPrice: 0 }
+          map[sample.category].items.push(item)
+          map[sample.category].totalPrice += Number(item.unit_price) || 0
+          // Also merge into store for edit popup
+          if (!store.items.find(i => i.id === item.id)) store.items.push(item)
+        }
+      }
+      searchActive.value = true
+      searchGroups.value = Object.values(map).sort((a, b) => a.sample.localeCompare(b.sample, 'zh'))
+    } catch {}
+  }, 300)
+}
 
 function onExport() {
   exportItems(filteredItems.value, '药品检测项目')
