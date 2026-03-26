@@ -189,7 +189,7 @@
         <div class="popup-header">
           <div>
             <h3>添加检测项目</h3>
-            <span class="popup-sub">共 {{ cartAddItems.length }} 项可添加</span>
+            <span class="popup-sub">{{ cartAddSample ? cartAddSample + ' · ' : '' }}{{ cartAddItems.length }} 项可添加</span>
           </div>
           <div class="sheet-close" @click="showCartAddPopup = false">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -327,7 +327,7 @@ function selectSampleForEdit(cat) {
 async function loadCartAddItems() {
   try {
     const itemType = quotation.value?.type === 'packaging' ? 'packaging' : 'drug'
-    const { data } = await itemsApi.list({ type: itemType, search: cartAddSearch.value, page: 1, page_size: 50 })
+    const { data } = await itemsApi.list({ type: itemType, search: cartAddSearch.value, category: cartAddSample.value, page: 1, page_size: 200 })
     const existingIds = new Set(editForm.value.items.map(i => i.id))
     cartAddItems.value = (data.items || []).filter(i => !existingIds.has(i.id))
   } catch {}
