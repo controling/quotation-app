@@ -67,18 +67,12 @@
     <!-- Auto Generate from Text -->
     <div class="section-head">
       <h3>智能生成报价单</h3>
-      <div style="display:flex;gap:8px;align-items:center">
-        <select v-model="quoteType" style="font-size:12px;padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:#fff">
-          <option value="drug">药品</option>
-          <option value="packaging">药包材</option>
-        </select>
-      </div>
     </div>
     <div class="m-card" style="margin-bottom:12px">
       <div style="padding:10px 14px">
         <textarea
           v-model="pasteText"
-          placeholder="粘贴内容自动生成报价单，支持以下格式：&#10;&#10;格式1（每行一个）: 样品名+空格+检测项目&#10;  中药饮片-丁香 性状&#10;  中药饮片-丁香 水分&#10;&#10;格式2（制表符分隔）: 样品名[TAB]检测项目&#10;  玻璃安瓶  外观&#10;  玻璃安瓶  内应力&#10;&#10;也可直接粘贴Excel数据"
+          placeholder="粘贴样品名称，一行一个或用逗号分隔&#10;&#10;示例：&#10;  八角茴香&#10;  马松子&#10;  亚甲蓝&#10;  八角茴香, 马松子, 亚甲蓝&#10;&#10;输入样品名会自动匹配该样品下所有检测项目&#10;也可粘贴Excel数据"
           style="width:100%;height:120px;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;resize:vertical;box-sizing:border-box;line-height:1.6;font-family:inherit"
         ></textarea>
         <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
@@ -88,10 +82,8 @@
           </button>
           <div style="flex:1"></div>
           <span style="font-size:12px;color:var(--text-3)">{{ matchedCount > 0 ? `已匹配 ${matchedCount} 项` : '' }}</span>
-          <button class="btn btn-primary btn-sm" @click="onAutoGenerate" :disabled="!pasteText.trim()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-            生成报价单
-          </button>
+          <button class="btn btn-primary btn-sm" @click="onAutoGenerate('drug')" :disabled="!pasteText.trim()">药品报价</button>
+          <button class="btn btn-sm" style="background:var(--accent);color:#fff;border:none" @click="onAutoGenerate('packaging')" :disabled="!pasteText.trim()">包材报价</button>
         </div>
       </div>
     </div>
@@ -173,7 +165,6 @@ const stats = ref({ drug_items: 0, packaging_items: 0, drug_quotes: 0, packaging
 
 // Auto generate from text
 const pasteText = ref('')
-const quoteType = ref('drug')
 const matchedCount = ref(0)
 const allDrugItems = ref([])
 const allPkgItems = ref([])
@@ -185,13 +176,12 @@ onMounted(async () => {
     stats.value = res.data
   } catch {}
   quoteStore.loadQuotations()
-  // Load all items for matching
   try {
-    const { data } = await itemsApi.all("drug")
+    const { data } = await itemsApi.all('drug')
     allDrugItems.value = data.items || []
   } catch {}
   try {
-    const { data } = await itemsApi.all("packaging")
+    const { data } = await itemsApi.all('packaging')
     allPkgItems.value = data.items || []
   } catch {}
 })
@@ -199,45 +189,48 @@ onMounted(async () => {
 // Watch paste text to show match count
 watch(pasteText, () => {
   if (!pasteText.value.trim()) { matchedCount.value = 0; return }
-  const matched = matchItems(pasteText.value)
+  const matched = matchItems(pasteText.value, 'drug')
   matchedCount.value = matched.length
 })
 
-function matchItems(text) {
-  const items = quoteType.value === 'drug' ? allDrugItems.value : allPkgItems.value
-  const lines = text.split(/\n/).map(l => l.trim()).filter(Boolean)
+function matchItems(text, type) {
+  const items = type === 'drug' ? allDrugItems.value : allPkgItems.value
+  // Split by any combination of: newline, comma, semicolon, pipe, tab, Chinese punctuation, space
+  const tokens = text.split(/[\n,，;；|｜\t、\r]+/).map(l => l.trim()).filter(Boolean)
   const results = []
-  for (const line of lines) {
-    // Split by tab, multiple spaces, or single space
-    const parts = line.split(/\t| {2,}/).map(p => p.trim()).filter(Boolean)
-    let keywords = []
-    if (parts.length >= 2) {
-      // Format: sample_name + test_item (or more columns)
-      keywords = parts
-    } else {
-      // Single line - split by space as keyword
-      keywords = line.split(/\s+/).filter(Boolean)
-    }
-    // Find best matching item
-    let best = null
-    let bestScore = 0
-    for (const item of items) {
-      let score = 0
-      const target = `${item.category} ${item.name}`.toLowerCase()
-      for (const kw of keywords) {
-        const k = kw.toLowerCase()
-        if (target.includes(k)) score += k.length
+  for (const token of tokens) {
+    // Try to detect "sample + item" format: last word is item name, rest is sample
+    const words = token.split(/\s+/).filter(Boolean)
+    // Strategy 1: treat entire token as a sample name, find ALL items for that sample
+    const catMatched = items.filter(item => item.category.includes(token))
+    if (catMatched.length > 0) {
+      for (const m of catMatched) {
+        if (!results.find(r => r.id === m.id)) results.push({ ...m })
       }
-      // Exact item name match bonus
-      if (item.name.toLowerCase() === keywords[keywords.length - 1]?.toLowerCase()) score += 100
-      // Exact category match bonus
-      if (keywords.length > 1 && item.category.toLowerCase().includes(keywords[0].toLowerCase())) score += 50
-      if (score > bestScore) { bestScore = score; best = item }
+      continue
     }
-    if (best && bestScore > 0) {
-      // Avoid duplicates
-      if (!results.find(r => r.id === best.id)) {
-        results.push({ ...best })
+    // Strategy 2: if multiple words, try each word as sample name or item name
+    if (words.length > 1) {
+      // First try: last word is item name, rest is sample
+      const sampleKw = words.slice(0, -1).join('')
+      const itemKw = words[words.length - 1]
+      const matched = items.filter(item =>
+        item.category.includes(sampleKw) && item.name.includes(itemKw)
+      )
+      if (matched.length > 0) {
+        for (const m of matched) {
+          if (!results.find(r => r.id === m.id)) results.push({ ...m })
+        }
+        continue
+      }
+      // Second try: any word matches sample or item
+      for (const w of words) {
+        const wMatched = items.filter(item =>
+          item.category.includes(w) || item.name.includes(w)
+        )
+        for (const m of wMatched) {
+          if (!results.find(r => r.id === m.id)) results.push({ ...m })
+        }
       }
     }
   }
@@ -254,13 +247,12 @@ async function pasteFromClipboard() {
   }
 }
 
-async function onAutoGenerate() {
+async function onAutoGenerate(type) {
   const text = pasteText.value.trim()
   if (!text) { toast('请先输入或粘贴内容'); return }
-  const matched = matchItems(text)
-  if (matched.length === 0) { toast('未匹配到检测项目，请检查输入内容'); return }
+  const matched = matchItems(text, type)
+  if (matched.length === 0) { toast('未匹配到检测项目，请检查输入内容或切换报价类型'); return }
 
-  // Group by category (sample)
   const cart = matched.map(item => ({
     id: item.id, name: item.name, category: item.category,
     standard: item.standard, method: item.method,
@@ -268,18 +260,14 @@ async function onAutoGenerate() {
     cma: item.cma, cnas: item.cnas,
     cycle_days: item.cycle_days, description: item.description
   }))
-
   const cartSamples = [...new Set(cart.map(i => i.category))]
   const total = cart.reduce((s, i) => s + i.unit_price * i.quantity, 0)
   const sampleName = cartSamples.join('、')
 
-  // Get customer name from first line if it looks like one, otherwise use default
-  const customerName = '智能报价单'
-
   try {
     const q = await quoteStore.createQuotationDirect({
-      title: customerName, customer_name: customerName, contact_person: '',
-      sample_name: sampleName, quotation_type: quoteType.value,
+      title: '智能报价单', customer_name: '智能报价单', contact_person: '',
+      sample_name: sampleName, quotation_type: type,
       total_amount: total,
       items_json: cart.map(i => ({
         id: i.id, name: i.name, category: i.category,
