@@ -194,7 +194,7 @@
         <div style="padding:0 14px 8px">
           <div class="m-search-bar" style="height:36px">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" placeholder="搜索项目名称或样品..." v-model="cartAddSearch" />
+            <input type="text" placeholder="搜索项目名称或样品..." v-model="cartAddSearch" @input="onCartAddSearch" />
           </div>
         </div>
         <div class="popup-actions">
@@ -373,20 +373,38 @@ function openAddItemForSample(sample) {
   cartAddSample.value = sample
   selectedIds.value = new Set()
   cartAddSearch.value = ''
+  cartAddItems.value = []
+  cartAddTotal.value = 0
   showCartAddPopup.value = true
+  loadCartAddItems()
 }
 const cartAddSearch = ref('')
-const cartAddFilteredItems = computed(() => {
-  const existingIds = new Set(cart.value.map(i => i.id))
-  let items = store.items.filter(i => !existingIds.has(i.id))
-  if (cartAddSearch.value) {
-    const q = cartAddSearch.value.toLowerCase()
-    items = items.filter(i => i.name.toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q))
-  }
-  return items.slice(0, 100)
-})
+const cartAddItems = ref([])
+const cartAddTotal = ref(0)
+let cartAddTimer = null
+
+async function loadCartAddItems() {
+  try {
+    const { data } = await packagingItemsApi.list({ search: cartAddSearch.value, page: 1, page_size: 50 })
+    const existingIds = new Set(cart.value.map(i => i.id))
+    cartAddItems.value = []
+    for (const sample of (data.samples || [])) {
+      for (const item of sample.items) {
+        if (!existingIds.has(item.id)) {
+          cartAddItems.value.push(item)
+        }
+      }
+    }
+    cartAddTotal.value = data.total
+  } catch {}
+}
+function onCartAddSearch() {
+  clearTimeout(cartAddTimer)
+  cartAddTimer = setTimeout(() => loadCartAddItems(), 300)
+}
+const cartAddFilteredItems = computed(() => cartAddItems.value)
 function addItemsToCartSample() {
-  const items = store.items.filter(i => selectedIds.value.has(i.id))
+  const items = cartAddItems.value.filter(i => selectedIds.value.has(i.id))
   let added = 0
   for (const item of items) {
     if (!cart.value.find(c => c.id === item.id)) {
