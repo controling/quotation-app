@@ -122,7 +122,7 @@
             </div>
           </div>
           <div v-if="editForm.items.length === 0" style="text-align:center;padding:16px;color:var(--text-3);font-size:13px">暂无检测项目，请点击下方添加</div>
-          <button class="btn btn-ghost btn-sm btn-block" style="margin-top:8px" @click="openAddItemForSample('')">+ 添加检测项目</button>
+          <button class="btn btn-ghost btn-sm btn-block" style="margin-top:8px" @click="openSampleSelector">+ 添加检测项目</button>
         </div>
       </div>
 
@@ -154,49 +154,74 @@
       </div>
     </div>
 
-    <!-- Cart add item popup -->
-    <van-popup v-model:show="showCartAddPopup" position="bottom" round :style="{ maxHeight: '85%' }">
+    <!-- Sample selector popup -->
+    <van-popup v-model:show="showSampleSelector" position="bottom" round :style="{ maxHeight: '85%' }">
       <div class="popup-wrap">
         <div class="popup-header">
           <div>
-            <h3>添加检测项目</h3>
-            <span class="popup-sub">共 {{ cartAddItems.length }} 项</span>
+            <h3>选择样品</h3>
+            <span class="popup-sub">共 {{ sampleSelectorList.length }} 个样品</span>
           </div>
-          <div class="sheet-close" @click="showCartAddPopup = false">
+          <div class="sheet-close" @click="showSampleSelector = false">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </div>
         </div>
         <div style="padding:0 14px 8px">
           <div class="m-search-bar" style="height:36px">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" placeholder="搜索样品名或检测项目..." v-model="cartAddSearch" @input="onCartAddSearch" />
+            <input type="text" placeholder="搜索样品名称..." v-model="sampleSelectorSearch" @input="onSampleSelectorSearch" />
+          </div>
+        </div>
+        <div class="popup-items">
+          <div v-for="cat in sampleSelectorList" :key="cat" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;border-bottom:1px solid #f5f5f7" @click="selectSampleForEdit(cat)">
+            <div>
+              <div style="font-weight:600;font-size:14px">{{ cat }}</div>
+              <div style="font-size:12px;color:var(--text-3);margin-top:2px">{{ getSampleItemCount(cat) }}项检测</div>
+            </div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2" width="18" height="18"><path d="M9 18l6-6-6-6"/></svg>
+          </div>
+          <div v-if="sampleSelectorLoading" style="text-align:center;padding:16px">
+            <van-loading size="20px">加载中...</van-loading>
+          </div>
+          <div v-if="!sampleSelectorLoading && sampleSelectorHasMore" style="text-align:center;padding:12px">
+            <van-button plain size="small" @click="loadMoreSampleSelector">加载更多</van-button>
+          </div>
+        </div>
+      </div>
+    </van-popup>
+
+    <!-- Sample items popup (for adding to edit) -->
+    <van-popup v-model:show="showCartAddPopup" position="bottom" round :style="{ maxHeight: '85%' }">
+      <div class="popup-wrap" v-if="selectedSampleForEdit">
+        <div class="popup-header">
+          <div>
+            <h3>{{ selectedSampleForEdit }}</h3>
+            <span class="popup-sub">{{ sampleEditItems.length }}项检测</span>
+          </div>
+          <div class="sheet-close" @click="showCartAddPopup = false">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </div>
         </div>
         <div class="popup-actions">
-          <button class="btn btn-sm btn-ghost" @click="selectedEditIds = new Set(cartAddItems.map(i => i.id))">全选</button>
-          <button class="btn btn-sm btn-ghost" @click="selectedEditIds = new Set()">取消全选</button>
-          <button class="btn btn-sm btn-primary" @click="addItemsToEdit">加入 ({{ selectedEditIds.size }})</button>
+          <button class="btn btn-sm btn-ghost" @click="selectAllSampleEdit">全选</button>
+          <button class="btn btn-sm btn-ghost" @click="deselectAllSampleEdit">取消全选</button>
+          <button class="btn btn-sm btn-primary" @click="addSelectedToEdit">加入 ({{ selectedEditIds.size }})</button>
         </div>
         <div class="popup-items">
-          <div v-for="group in cartAddSampleGroups" :key="group.name" style="border-bottom:1px solid var(--border);padding-bottom:4px;margin-bottom:4px">
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;cursor:pointer" @click="toggleSampleItems(group)">
-              <div style="display:flex;align-items:center;gap:6px">
-                <van-checkbox :model-value="isSampleFullySelected(group)" @update:model-value="v => toggleSampleItems(group, v)" @click.stop />
-                <span style="font-weight:600;font-size:13px;color:var(--primary)">{{ group.name }}</span>
-              </div>
-              <span style="font-size:11px;color:var(--text-3)">{{ group.items.length }}项</span>
-            </div>
-            <van-checkbox-group v-model="selectedEditIdsArr">
-              <div v-for="item in group.items" :key="item.id" style="display:flex;align-items:center;justify-content:space-between;padding:5px 12px 5px 32px;cursor:pointer" @click="toggleEditItem(item.id)">
-                <div style="display:flex;align-items:center;gap:6px">
+          <van-checkbox-group v-model="selectedEditIdsArr">
+            <van-cell v-for="item in sampleEditItems" :key="item.id" clickable @click="toggleEditItem(item.id)">
+              <template #title>
+                <div style="display:flex;align-items:center;gap:8px">
                   <van-checkbox :name="item.id" @click.stop />
-                  <span style="font-size:13px">{{ item.name }}</span>
-                  <span style="font-size:11px;color:var(--text-3)">{{ item.method || '-' }}</span>
+                  <div>
+                    <div style="font-weight:500">{{ item.name }}</div>
+                    <div style="font-size:12px;color:var(--text-3)">{{ item.method || '-' }} | {{ item.cycle_days }}天</div>
+                  </div>
                 </div>
-                <span class="price" style="font-size:13px">¥{{ item.unit_price }}</span>
-              </div>
-            </van-checkbox-group>
-          </div>
+              </template>
+              <template #value><span class="price">¥{{ item.unit_price }}</span></template>
+            </van-cell>
+          </van-checkbox-group>
         </div>
       </div>
     </van-popup>
@@ -230,15 +255,23 @@ const searchText = ref('')
 
 // Edit mode
 const showCartAddPopup = ref(false)
-const cartAddSample = ref('')
-const cartAddSearch = ref('')
-const cartAddItems = ref([])
+const selectedSampleForEdit = ref('')
+const sampleEditItems = ref([])
 const selectedEditIds = ref(new Set())
 const selectedEditIdsArr = computed({
   get: () => Array.from(selectedEditIds.value),
   set: (v) => { selectedEditIds.value = new Set(v) }
 })
-let cartAddTimer = null
+
+// Sample selector
+const showSampleSelector = ref(false)
+const sampleSelectorSearch = ref('')
+const sampleSelectorList = ref([])
+const sampleSelectorLoading = ref(false)
+const sampleSelectorHasMore = ref(false)
+const allSampleCategories = ref([])
+let sampleSelectorPage = 1
+let sampleSelectorTimer = null
 
 const editSampleGroups = computed(() => {
   const map = {}
@@ -257,68 +290,89 @@ function removeEditSample(name) {
   editForm.value.items = editForm.value.items.filter(i => i.category !== name)
 }
 
-function openAddItemForSample(sample) {
-  cartAddSample.value = sample
-  selectedEditIds.value = new Set()
-  cartAddSearch.value = ''
-  cartAddItems.value = []
-  showCartAddPopup.value = true
-  loadCartAddItems()
-}
-async function loadCartAddItems() {
+// Sample selector for edit
+async function loadAllCategories() {
+  if (allSampleCategories.value.length > 0) return
+  const itemType = quotation.value?.type === 'packaging' ? 'packaging' : 'drug'
+  const api = itemType === 'packaging' ? (await import('../api')).packagingItemsApi : (await import('../api')).drugItemsApi
   try {
-    const itemType = quotation.value?.type === 'packaging' ? 'packaging' : 'drug'
-    const { data } = await itemsApi.all(itemType)
-    const existingIds = new Set(editForm.value.items.map(i => i.id))
-    let items = (data.items || []).filter(i => !existingIds.has(i.id))
-    if (cartAddSearch.value) {
-      const q = cartAddSearch.value.toLowerCase()
-      items = items.filter(i => i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q))
-    }
-    cartAddItems.value = items
+    const { data } = await api.list({ page: 1, page_size: 10000 })
+    allSampleCategories.value = (data.samples || []).map(s => s.category)
   } catch {}
 }
-function onCartAddSearch() {
-  clearTimeout(cartAddTimer)
-  cartAddTimer = setTimeout(() => loadCartAddItems(), 300)
-}
 
-const cartAddSampleGroups = computed(() => {
-  const map = {}
-  cartAddItems.value.forEach(item => {
-    const cat = item.category || '未分类'
-    if (!map[cat]) map[cat] = { name: cat, items: [] }
-    map[cat].items.push(item)
+function openSampleSelector() {
+  showSampleSelector.value = true
+  sampleSelectorSearch.value = ''
+  loadAllCategories().then(() => {
+    filterSampleSelector()
   })
-  return Object.values(map).sort((a, b) => a.name.localeCompare(b.name, 'zh'))
-})
-
-function isSampleFullySelected(group) {
-  return group.items.every(i => selectedEditIds.value.has(i.id))
 }
 
-function toggleSampleItems(group, forceVal) {
-  const allSelected = isSampleFullySelected(group)
-  const shouldSelect = forceVal !== undefined ? forceVal : !allSelected
-  for (const item of group.items) {
-    if (shouldSelect) selectedEditIds.value.add(item.id)
-    else selectedEditIds.value.delete(item.id)
-  }
-  selectedEditIds.value = new Set(selectedEditIds.value)
+function filterSampleSelector() {
+  const q = sampleSelectorSearch.value.trim().toLowerCase()
+  let list = allSampleCategories.value
+  if (q) list = list.filter(c => c.toLowerCase().includes(q))
+  sampleSelectorList.value = list
+  sampleSelectorHasMore.value = false
 }
-function addItemsToEdit() {
-  const targetSample = cartAddSample.value
-  const items = cartAddItems.value.filter(i => selectedEditIds.value.has(i.id))
+
+function onSampleSelectorSearch() {
+  clearTimeout(sampleSelectorTimer)
+  sampleSelectorTimer = setTimeout(() => filterSampleSelector(), 300)
+}
+
+function loadMoreSampleSelector() {}
+
+function getSampleItemCount(cat) {
+  return sampleEditItems.value.length > 0 && selectedSampleForEdit.value === cat ? sampleEditItems.value.length : '?'
+}
+
+function selectSampleForEdit(cat) {
+  selectedSampleForEdit.value = cat
+  selectedEditIds.value = new Set()
+  showSampleSelector.value = false
+  showCartAddPopup.value = true
+  loadSampleEditItems(cat)
+}
+
+async function loadSampleEditItems(cat) {
+  const itemType = quotation.value?.type === 'packaging' ? 'packaging' : 'drug'
+  const api = itemType === 'packaging' ? (await import('../api')).packagingItemsApi : (await import('../api')).drugItemsApi
+  try {
+    const { data } = await api.list({ category: cat, page: 1, page_size: 200 })
+    const existingIds = new Set(editForm.value.items.map(i => i.id))
+    sampleEditItems.value = (data.samples || []).flatMap(s => s.items).filter(i => !existingIds.has(i.id))
+  } catch {}
+}
+
+function selectAllSampleEdit() { selectedEditIds.value = new Set(sampleEditItems.value.map(i => i.id)) }
+function deselectAllSampleEdit() { selectedEditIds.value = new Set() }
+
+function addSelectedToEdit() {
+  const items = sampleEditItems.value.filter(i => selectedEditIds.value.has(i.id))
   let added = 0
   for (const item of items) {
     if (!editForm.value.items.find(c => c.id === item.id)) {
-      editForm.value.items.push({ id: item.id, name: item.name, category: targetSample || item.category, standard: item.standard, method: item.method, unit_price: item.unit_price, quantity: 1, cma: item.cma, cnas: item.cnas, cycle_days: item.cycle_days, description: item.description })
+      editForm.value.items.push({ id: item.id, name: item.name, category: item.category, standard: item.standard, method: item.method, unit_price: item.unit_price, quantity: 1, cma: item.cma, cnas: item.cnas, cycle_days: item.cycle_days, description: item.description })
       added++
     }
   }
   showCartAddPopup.value = false
   if (added) toast(`已添加 ${added} 项`)
 }
+
+function openAddItemForSample(sample) {
+  if (sample) {
+    selectedSampleForEdit.value = sample
+    selectedEditIds.value = new Set()
+    showCartAddPopup.value = true
+    loadSampleEditItems(sample)
+  } else {
+    openSampleSelector()
+  }
+}
+
 function toggleEditItem(id) {
   if (selectedEditIds.value.has(id)) selectedEditIds.value.delete(id)
   else selectedEditIds.value.add(id)
