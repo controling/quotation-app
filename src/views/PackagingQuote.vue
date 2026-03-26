@@ -77,44 +77,50 @@
     <!-- Step 3: 购物车 -->
     <div v-show="currentStep === 2">
       <div v-if="cart.length > 0">
-        <div class="section-head"><h3>检测购物车 ({{ cart.length }}项)</h3></div>
-        <div v-for="sample in cartSamples" :key="sample" class="cart-group">
-          <div class="cart-group-header">
-            <span class="cart-sample-name" style="color:var(--accent)">{{ sample }}</span>
-            <div style="display:flex;align-items:center;gap:8px">
-              <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" width="18" height="18" style="cursor:pointer" @click="openAddItemForSample(sample)">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-              <svg viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" width="18" height="18" style="cursor:pointer" @click="removeSampleFromCart(sample)">
-                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-              </svg>
+        <div class="m-card">
+          <div class="m-card-header">
+            <h3>检测购物车 ({{ cart.length }}项)</h3>
+            <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:none" @click="clearCart">清空</button>
+          </div>
+          <div class="m-card-body" style="padding:8px 14px">
+            <div v-for="sample in cartSamples" :key="sample" style="margin-bottom:8px">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:4px">
+                <span style="font-weight:700;color:var(--accent);font-size:14px">{{ sample }}</span>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" width="18" height="18" style="cursor:pointer" @click="openAddItemForSample(sample)">
+                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" width="18" height="18" style="cursor:pointer" @click="removeSampleFromCart(sample)">
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                  </svg>
+                </div>
+              </div>
+              <div v-for="item in getCartItemsBySample(sample)" :key="item.id" class="cart-item">
+                <div class="cart-item-info" style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <span class="cart-item-name">{{ item.name }}</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" width="14" height="14" style="cursor:pointer;flex-shrink:0;opacity:.6" @click="removeItemFromCart(item.id)">
+                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </div>
+                  <div class="cart-item-meta">{{ item.method || '-' }}</div>
+                </div>
+                <div class="cart-item-right">
+                  <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
+                    <span style="font-size:11px;color:var(--text-3)">单价</span>
+                    <input class="form-input" type="number" v-model.number="item.unit_price" style="width:70px;height:28px;font-size:13px;text-align:right;padding:0 6px" />
+                  </div>
+                  <div style="display:flex;align-items:center;justify-content:space-between">
+                    <van-stepper v-model="item.quantity" :min="1" :max="99" theme="round" button-size="20" />
+                    <span class="price" style="min-width:65px;text-align:right">¥{{ item.unit_price * item.quantity }}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-          <div v-for="item in getCartItemsBySample(sample)" :key="item.id" class="cart-item">
-            <div class="cart-item-info" style="flex:1;min-width:0">
-              <div style="display:flex;align-items:center;gap:6px">
-                <span class="cart-item-name">{{ item.name }}</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" width="14" height="14" style="cursor:pointer;flex-shrink:0;opacity:.6" @click="removeItemFromCart(item.id)">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-              </div>
-              <div class="cart-item-meta">{{ item.method || '-' }}</div>
-            </div>
-            <div class="cart-item-right">
-              <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
-                <span style="font-size:11px;color:var(--text-3)">单价</span>
-                <input class="form-input" type="number" v-model.number="item.unit_price" style="width:70px;height:28px;font-size:13px;text-align:right;padding:0 6px" />
-              </div>
-              <div style="display:flex;align-items:center;justify-content:space-between">
-                <van-stepper v-model="item.quantity" :min="1" :max="99" theme="round" button-size="20" />
-                <span class="price" style="min-width:65px;text-align:right">¥{{ item.unit_price * item.quantity }}</span>
-              </div>
-            </div>
+          <div style="padding:0 14px 12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;padding-top:12px">
+            <span style="font-size:15px">合计: <b class="price" style="font-size:20px">¥{{ cartTotal.toFixed(2) }}</b></span>
           </div>
-        </div>
-        <div class="cart-total">
-          <span style="font-size:15px">合计: <b class="price" style="font-size:20px">¥{{ cartTotal.toFixed(2) }}</b></span>
-          <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:none" @click="clearCart">清空</button>
         </div>
         <button class="btn btn-ghost btn-sm btn-block" style="margin-top:8px" @click="currentStep = 1">+ 添加样品</button>
       </div>
