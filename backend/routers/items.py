@@ -1,10 +1,11 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+import re
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, and_
 
 from database import get_db
 from models import DrugItem, PackagingItem
@@ -19,6 +20,31 @@ class ItemsListParams(BaseModel):
     category: str = ""
     page: int = 1
     page_size: int = 20
+
+
+def _split_search(search: str) -> list[str]:
+    """将搜索词按多种分隔符拆分为多个关键词"""
+    terms = re.split(r'[,，;；、\\/|]', search)
+    return [t.strip() for t in terms if t.strip()]
+
+
+def _apply_search(q, Model, search: str):
+    """对查询应用多关键词搜索（OR 逻辑）"""
+    terms = _split_search(search)
+    if not terms:
+        return q
+    conditions = []
+    for term in terms:
+        like = f"%{term}%"
+        conditions.append(
+            or_(
+                Model.name.like(like),
+                Model.category.like(like),
+                Model.standard.like(like),
+                Model.method.like(like),
+            )
+        )
+    return q.filter(or_(*conditions))
 
 
 def _item_to_dict(item, item_type: str):
@@ -47,15 +73,7 @@ def list_all_items(params: ItemsListParams, db: Session = Depends(get_db), user=
         q = q.filter(Model.category == params.category)
 
     if params.search:
-        like = f"%{params.search}%"
-        q = q.filter(
-            or_(
-                Model.name.like(like),
-                Model.category.like(like),
-                Model.standard.like(like),
-                Model.method.like(like),
-            )
-        )
+        q = _apply_search(q, Model, params.search)
 
     total = q.count()
     page_size = min(params.page_size, 100)

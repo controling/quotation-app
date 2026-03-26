@@ -1,6 +1,7 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+import re
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -67,8 +68,13 @@ def list_items(params: ListParams, db: Session = Depends(get_db), user=Depends(g
         q = q.filter(DrugItem.category == params.category)
 
     if params.search:
-        like = f"%{params.search}%"
-        q = q.filter(or_(DrugItem.name.like(like), DrugItem.category.like(like), DrugItem.standard.like(like)))
+        terms = [t.strip() for t in re.split(r'[,，;；、\\/|]', params.search) if t.strip()]
+        if terms:
+            conds = []
+            for term in terms:
+                like = f"%{term}%"
+                conds.append(or_(DrugItem.name.like(like), DrugItem.category.like(like), DrugItem.standard.like(like)))
+            q = q.filter(or_(*conds))
 
     all_items = q.order_by(DrugItem.category, DrugItem.id).all()
 
