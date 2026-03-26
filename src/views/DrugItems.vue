@@ -3,7 +3,7 @@
     <van-loading v-if="!store.loaded" vertical style="padding: 40px 0">加载中...</van-loading>
     <template v-else>
       <!-- Sticky Search -->
-      <div class="m-search">
+      <div class="m-search" style="margin-top: -14px;">
         <div class="m-search-bar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="text" placeholder="搜索样品名称、检测项目..." v-model="searchText" @input="onSearch" />

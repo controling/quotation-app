@@ -37,7 +37,7 @@
       <div class="m-card">
         <div class="m-card-header">
           <h3>选择药包材类别</h3>
-          <span style="font-size:12px;color:var(--text-3)">共 {{ (searchActive ? searchTotal : store.categories.length) }} 个类别</span>
+          <span style="font-size:12px;color:var(--text-3)">共 {{ sampleTotal }} 个类别</span>
         </div>
         <div class="m-search" style="padding:8px 14px">
           <div class="m-search-bar" style="height:38px">
@@ -45,9 +45,9 @@
             <input type="text" placeholder="搜索包材名称..." v-model="sampleSearch" @input="onSampleSearch" />
           </div>
         </div>
-        <div class="sample-list" style="padding:0 14px 8px">
+        <div class="sample-list" ref="sampleListRef" style="padding:0 14px 8px;max-height:60vh;overflow-y:auto">
           <div
-            v-for="cat in pagedCategories"
+            v-for="cat in displayedCategories"
             :key="cat"
             class="order-card"
             style="margin-bottom:6px;cursor:pointer"
@@ -61,9 +61,12 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2" width="18" height="18"><path d="M9 18l6-6-6-6"/></svg>
             </div>
           </div>
-        </div>
-        <div class="pagination" v-if="totalPages > 1" style="padding:8px 14px">
-          <van-pagination v-model="samplePage" :total-items="filteredCategories.length" :items-per-page="samplePageSize" :show-page-size="3" />
+          <div v-if="sampleLoading" style="text-align:center;padding:16px">
+            <van-loading size="20px">加载中...</van-loading>
+          </div>
+          <div v-if="!sampleLoading && sampleHasMore" style="text-align:center;padding:12px">
+            <van-button plain size="small" @click="loadMoreSamples">加载更多</van-button>
+          </div>
         </div>
       </div>
       <div class="step-action">
@@ -237,8 +240,7 @@ const currentStep = ref(0)
 const customerName = ref('')
 const contactPerson = ref('')
 const sampleSearch = ref('')
-const samplePage = ref(1)
-const samplePageSize = 20
+const sampleListRef = ref(null)
 
 const showSamplePopup = ref(false)
 const selectedSample = ref('')
@@ -248,54 +250,56 @@ const cart = ref([])
 const showCartAddPopup = ref(false)
 const cartAddSample = ref('')
 
-// Server-side search state
-const searchActive = ref(false)
-const searchResults = ref([])
-const searchTotal = ref(0)
-let searchTimer = null
+// Server-side sample loading
+const sampleLoading = ref(false)
+const sampleHasMore = ref(false)
+const displayedCategories = ref([])
+const sampleTotal = ref(0)
+let sampleCurrentPage = 1
+let sampleSearchTimer = null
 
-onMounted(() => { store.loadAll() })
+onMounted(() => { store.loadAll(); loadSamples(1) })
 
-const allCategories = computed(() => store.categories)
-const filteredCategories = computed(() => {
-  if (searchActive.value) return searchResults.value
-  if (!sampleSearch.value) return allCategories.value
-  return allCategories.value.filter(c => c.toLowerCase().includes(sampleSearch.value.toLowerCase()))
-})
-const totalPages = computed(() => Math.ceil(filteredCategories.value.length / samplePageSize))
-const pagedCategories = computed(() => {
-  const start = (samplePage.value - 1) * samplePageSize
-  return filteredCategories.value.slice(start, start + samplePageSize)
-})
-
-function onSampleSearch() {
-  samplePage.value = 1
-  clearTimeout(searchTimer)
-  const q = sampleSearch.value.trim()
-  if (!q) {
-    searchActive.value = false
-    searchResults.value = []
-    return
-  }
-  searchTimer = setTimeout(async () => {
-    try {
-      const { data } = await packagingItemsApi.list({ search: q, page_size: 50, page: 1 })
-      searchActive.value = true
-      searchTotal.value = data.total
-      searchResults.value = (data.samples || []).map(s => s.category)
-      const existingIds = new Set(store.items.map(i => i.id))
-      for (const sample of (data.samples || [])) {
-        for (const item of sample.items) {
-          if (!existingIds.has(item.id)) {
-            store.items.push(item)
-            existingIds.add(item.id)
-          }
+async function loadSamples(page, append = false) {
+  if (sampleLoading.value) return
+  sampleLoading.value = true
+  try {
+    const { data } = await packagingItemsApi.list({ search: sampleSearch.value, page, page_size: 20 })
+    const newCats = (data.samples || []).map(s => s.category)
+    const existingIds = new Set(store.items.map(i => i.id))
+    for (const sample of (data.samples || [])) {
+      for (const item of sample.items) {
+        if (!existingIds.has(item.id)) {
+          store.items.push(item)
+          existingIds.add(item.id)
         }
       }
-    } catch { searchActive.value = false }
+    }
+    if (append) {
+      displayedCategories.value = [...displayedCategories.value, ...newCats]
+    } else {
+      displayedCategories.value = newCats
+    }
+    sampleTotal.value = data.total
+    sampleCurrentPage = page
+    sampleHasMore.value = displayedCategories.value.length < data.total
+  } catch {}
+  sampleLoading.value = false
+}
+
+function loadMoreSamples() { loadSamples(sampleCurrentPage + 1, true) }
+
+function onSampleSearch() {
+  clearTimeout(sampleSearchTimer)
+  sampleSearchTimer = setTimeout(() => {
+    displayedCategories.value = []
+    sampleCurrentPage = 1
+    loadSamples(1)
   }, 300)
 }
 
+const allCategories = computed(() => store.categories)
+const totalPages = computed(() => Math.ceil(allCategories.value.length / 20))
 function getCategoryItemCount(cat) { return store.items.filter(i => i.category === cat).length }
 
 // Popup search
