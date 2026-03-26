@@ -47,7 +47,7 @@ export const usersApi = {
 
 // Drug Items
 export const drugItemsApi = {
-  list: (params) => api.post("/items/list", params),
+  list: (params) => api.post("/drug-items/list", params),
   categories: () => api.post('/drug-items/categories'),
   create: (data) => api.post('/drug-items/create', data),
   import: (items) => api.post('/drug-items/import', items),
@@ -76,7 +76,7 @@ export const quotationsApi = {
 
 // Items (unified)
 export const itemsApi = {
-  list: (params) => api.post("/items/list", params),
+  list: (params) => api.post("/drug-items/list", params),
   all: (type) => api.post("/items/all", { type }),
 }
 
