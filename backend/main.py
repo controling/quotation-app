@@ -32,6 +32,7 @@ from routers.drug_items import router as drug_items_router
 from routers.packaging_items import router as packaging_items_router
 from routers.quotations import router as quotations_router
 from routers.stats import router as stats_router
+from routers.items import router as items_router
 
 app.include_router(auth_router)
 app.include_router(users_router)
@@ -39,6 +40,7 @@ app.include_router(drug_items_router)
 app.include_router(packaging_items_router)
 app.include_router(quotations_router)
 app.include_router(stats_router)
+app.include_router(items_router)
 
 
 @app.get("/api/health")

@@ -144,7 +144,67 @@
 
 ---
 
-## 2. 药品检测项目 `/api/drug-items`
+## 2. 检测项目（统一接口） `/api/items`
+
+### 2.1 列表 `POST /api/items/list`
+
+**权限:** 登录用户
+
+获取所有检测项目，通过 `type` 参数区分药品和药包材。支持模糊搜索和分页。
+
+**请求:**
+```json
+{
+  "type": "drug",
+  "search": "含量",
+  "category": "中药饮片-丁香",
+  "page": 1,
+  "page_size": 20
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| type | string | 否 | `drug`=药品检测，`packaging`=药包材检测，默认 `drug` |
+| search | string | 否 | 模糊搜索（匹配名称、分类、标准、方法） |
+| category | string | 否 | 按分类精确筛选 |
+| page | int | 否 | 页码，默认 1 |
+| page_size | int | 否 | 每页条数，默认 20，最大 100 |
+
+**响应 `200`:**
+```json
+{
+  "total": 621,
+  "page": 1,
+  "page_size": 20,
+  "items": [
+    {
+      "id": 4461,
+      "type": "drug",
+      "category": "中药饮片-丁香",
+      "name": "含量测定",
+      "standard": "《中华人民共和国药典》 2015年版 四部 通则 0521",
+      "method": "气相色谱法",
+      "unit_price": 300.00,
+      "cma": 1,
+      "cnas": 1,
+      "cycle_days": 5,
+      "description": ""
+    }
+  ]
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| total | 符合条件的项目总数 |
+| items[].type | `drug`=药品，`packaging`=药包材 |
+| items[].cma | 1=有CMA资质，0=无 |
+| items[].cnas | 1=有CNAS资质，0=无 |
+
+---
+
+## 3. 药品检测项目 `/api/drug-items`
 
 ### 2.1 列表（分组） `POST /api/drug-items/list`
 
@@ -361,7 +421,7 @@
 
 ---
 
-## 3. 药包材检测项目 `/api/packaging-items`
+## 4. 药包材检测项目 `/api/packaging-items`
 
 接口结构与药品检测项目完全一致，仅路由前缀不同。
 
@@ -463,7 +523,7 @@
 
 ---
 
-## 4. 报价单 `/api/quotations`
+## 5. 报价单 `/api/quotations`
 
 ### 4.1 列表 `POST /api/quotations/list`
 
@@ -648,7 +708,7 @@
 
 ---
 
-## 5. 统计 `/api/stats`
+## 6. 统计 `/api/stats`
 
 ### 5.1 获取统计数据 `POST /api/stats`
 
@@ -683,7 +743,7 @@
 
 ---
 
-## 6. 用户管理 `/api/users`
+## 7. 用户管理 `/api/users`
 
 ### 6.1 用户列表 `GET /api/users`
 
@@ -761,7 +821,7 @@
 
 ---
 
-## 7. 健康检查
+## 8. 健康检查
 
 ### 7.1 健康检查 `GET /health`
 
