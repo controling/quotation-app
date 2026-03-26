@@ -85,3 +85,12 @@ def list_all_items(params: ItemsListParams, db: Session = Depends(get_db), user=
         "page_size": page_size,
         "items": [_item_to_dict(i, params.type) for i in items],
     }
+
+
+@router.post("/all")
+def list_all_for_match(body: dict, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """返回所有检测项目（无分页），用于智能匹配"""
+    item_type = body.get("type", "drug")
+    Model = DrugItem if item_type == "drug" else PackagingItem
+    items = db.query(Model).filter(Model.is_active == True).order_by(Model.category, Model.id).all()
+    return {"total": len(items), "items": [_item_to_dict(i, item_type) for i in items]}

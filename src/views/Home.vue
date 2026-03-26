@@ -177,12 +177,12 @@ onMounted(async () => {
   } catch {}
   quoteStore.loadQuotations()
   try {
-    const { data } = await drugItemsApi.list({ page: 1, page_size: 500 })
-    for (const s of (data.samples || [])) allDrugItems.value.push(...s.items)
+    const { data } = await itemsApi.all('drug')
+    allDrugItems.value = data.items || []
   } catch {}
   try {
-    const { data } = await packagingItemsApi.list({ page: 1, page_size: 500 })
-    for (const s of (data.samples || [])) allPkgItems.value.push(...s.items)
+    const { data } = await itemsApi.all('packaging')
+    allPkgItems.value = data.items || []
   } catch {}
 })
 
