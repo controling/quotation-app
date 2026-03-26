@@ -122,7 +122,7 @@
             </div>
           </div>
           <div v-if="editForm.items.length === 0" style="text-align:center;padding:16px;color:var(--text-3);font-size:13px">暂无检测项目，请点击下方添加</div>
-          <button class="btn btn-ghost btn-sm btn-block" style="margin-top:8px" @click="openAddItemForSample('')">+ 添加检测项目</button>
+          <button class="btn btn-ghost btn-sm btn-block" style="margin-top:8px" @click="openSampleSelector">+ 添加检测项目</button>
         </div>
       </div>
 
@@ -153,6 +153,35 @@
         <button class="btn btn-ghost btn-block" @click="cancelEdit" style="height:40px;margin-top:8px">取消</button>
       </div>
     </div>
+
+    <!-- Sample selector popup -->
+    <van-popup v-model:show="showSampleSelector" position="bottom" round :style="{ maxHeight: '85%' }">
+      <div class="popup-wrap">
+        <div class="popup-header">
+          <div>
+            <h3>选择样品</h3>
+            <span class="popup-sub">共 {{ sampleSelectorList.length }} 个样品</span>
+          </div>
+          <div class="sheet-close" @click="showSampleSelector = false">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </div>
+        </div>
+        <div style="padding:0 14px 8px">
+          <div class="m-search-bar" style="height:36px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" placeholder="搜索样品名称..." v-model="sampleSelectorSearch" @input="filterSampleSelector" />
+          </div>
+        </div>
+        <div class="popup-items">
+          <div v-for="cat in sampleSelectorList" :key="cat" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;border-bottom:1px solid #f5f5f7" @click="selectSampleForEdit(cat)">
+            <div style="font-weight:600;font-size:14px">{{ cat }}</div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2" width="18" height="18"><path d="M9 18l6-6-6-6"/></svg>
+          </div>
+          <div v-if="sampleSelectorList.length === 0 && !sampleSelectorLoading" style="text-align:center;padding:20px;color:var(--text-3)">无数据</div>
+          <div v-if="sampleSelectorLoading" style="text-align:center;padding:16px"><van-loading size="20px">加载中...</van-loading></div>
+        </div>
+      </div>
+    </van-popup>
 
     <!-- Cart add item popup -->
     <van-popup v-model:show="showCartAddPopup" position="bottom" round :style="{ maxHeight: '85%' }">
@@ -206,7 +235,7 @@ import { showConfirmDialog } from 'vant'
 import { useQuotationsStore } from '../stores/quotations'
 import { useDrugItemsStore } from '../stores/drugItems'
 import { usePackagingItemsStore } from '../stores/packagingItems'
-import { quotationsApi, itemsApi } from '../api'
+import { quotationsApi, itemsApi, drugItemsApi, packagingItemsApi } from '../api'
 import { exportQuotation } from '../utils/excel'
 
 const route = useRoute()
@@ -235,6 +264,13 @@ const selectedEditIdsArr = computed({
 })
 let cartAddTimer = null
 
+// Sample selector
+const showSampleSelector = ref(false)
+const sampleSelectorSearch = ref('')
+const sampleSelectorList = ref([])
+const sampleSelectorLoading = ref(false)
+const allSampleCategories = ref([])
+
 const editSampleGroups = computed(() => {
   const map = {}
   editForm.value.items.forEach(item => {
@@ -259,6 +295,34 @@ function openAddItemForSample(sample) {
   cartAddItems.value = []
   showCartAddPopup.value = true
   loadCartAddItems()
+}
+
+async function loadAllCategories() {
+  if (allSampleCategories.value.length > 0) return
+  const itemType = quotation.value?.type === 'packaging' ? 'packaging' : 'drug'
+  try {
+    const api = itemType === 'packaging' ? packagingItemsApi : drugItemsApi
+    const { data } = await api.categories()
+    allSampleCategories.value = data.all || data.majors || []
+  } catch {}
+}
+
+function openSampleSelector() {
+  sampleSelectorSearch.value = ''
+  showSampleSelector.value = true
+  loadAllCategories().then(() => filterSampleSelector())
+}
+
+function filterSampleSelector() {
+  const q = sampleSelectorSearch.value.trim().toLowerCase()
+  let list = allSampleCategories.value
+  if (q) list = list.filter(c => c.toLowerCase().includes(q))
+  sampleSelectorList.value = list
+}
+
+function selectSampleForEdit(cat) {
+  showSampleSelector.value = false
+  openAddItemForSample(cat)
 }
 async function loadCartAddItems() {
   try {
