@@ -81,9 +81,14 @@
         <div v-for="sample in cartSamples" :key="sample" class="cart-group">
           <div class="cart-group-header">
             <span class="cart-sample-name" style="color:var(--accent)">{{ sample }}</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" width="18" height="18" style="cursor:pointer;flex-shrink:0" @click="removeSampleFromCart(sample)">
-              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-            </svg>
+            <div style="display:flex;align-items:center;gap:8px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" width="18" height="18" style="cursor:pointer" @click="openAddItemForSample(sample)">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" width="18" height="18" style="cursor:pointer" @click="removeSampleFromCart(sample)">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+              </svg>
+            </div>
           </div>
           <div v-for="item in getCartItemsBySample(sample)" :key="item.id" class="cart-item">
             <div class="cart-item-info" style="flex:1;min-width:0">
@@ -163,6 +168,42 @@
         </div>
       </div>
     </van-popup>
+
+    <!-- Cart add item popup -->
+    <van-popup v-model:show="showCartAddPopup" position="bottom" round :style="{ maxHeight: '85%' }">
+      <div class="popup-wrap" v-if="cartAddSample">
+        <div class="popup-header">
+          <div>
+            <h3>添加项目到「{{ cartAddSample }}」</h3>
+            <span class="popup-sub">{{ cartAddAvailable.length }}项可添加</span>
+          </div>
+          <div class="sheet-close" @click="showCartAddPopup = false">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </div>
+        </div>
+        <div class="popup-actions">
+          <button class="btn btn-sm btn-ghost" @click="selectedIds = new Set(cartAddAvailable.map(i => i.id))">全选</button>
+          <button class="btn btn-sm btn-ghost" @click="selectedIds = new Set()">取消全选</button>
+          <button class="btn btn-sm btn-accent" @click="addItemsToCartSample">加入 ({{ selectedIds.size }})</button>
+        </div>
+        <div class="popup-items">
+          <van-checkbox-group v-model="selectedIdsArr">
+            <van-cell v-for="item in cartAddAvailable" :key="item.id" clickable @click="toggleItem(item.id)">
+              <template #title>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <van-checkbox :name="item.id" @click.stop />
+                  <div>
+                    <div style="font-weight:500">{{ item.name }}</div>
+                    <div style="font-size:12px;color:var(--text-3)">{{ item.method || '-' }} | {{ item.cycle_days }}天</div>
+                  </div>
+                </div>
+              </template>
+              <template #value><span class="price">¥{{ item.unit_price }}</span></template>
+            </van-cell>
+          </van-checkbox-group>
+        </div>
+      </div>
+    </van-popup>
   </div>
 </template>
 
@@ -191,6 +232,8 @@ const selectedSample = ref('')
 const selectedIds = ref(new Set())
 const selectedIdsArr = computed({ get: () => Array.from(selectedIds.value), set: (v) => { selectedIds.value = new Set(v) } })
 const cart = ref([])
+const showCartAddPopup = ref(false)
+const cartAddSample = ref('')
 
 // Server-side search state
 const searchActive = ref(false)
@@ -308,6 +351,26 @@ function getCartItemsBySample(sample) { return cart.value.filter(i => i.category
 function removeSampleFromCart(sample) { cart.value = cart.value.filter(i => i.category !== sample) }
 function removeItemFromCart(id) { cart.value = cart.value.filter(i => i.id !== id) }
 function clearCart() { cart.value = [] }
+
+function openAddItemForSample(sample) {
+  cartAddSample.value = sample
+  selectedIds.value = new Set()
+  showCartAddPopup.value = true
+}
+const cartAddSampleItems = computed(() => store.items.filter(i => i.category === cartAddSample.value))
+const cartAddAvailable = computed(() => cartAddSampleItems.value.filter(i => !cart.value.find(c => c.id === i.id)))
+function addItemsToCartSample() {
+  const items = cartAddSampleItems.value.filter(i => selectedIds.value.has(i.id))
+  let added = 0
+  for (const item of items) {
+    if (!cart.value.find(c => c.id === item.id)) {
+      cart.value.push({ id: item.id, name: item.name, category: item.category, standard: item.standard, method: item.method, unit_price: item.unit_price, quantity: 1, cma: item.cma, cnas: item.cnas, cycle_days: item.cycle_days, description: item.description })
+      added++
+    }
+  }
+  showCartAddPopup.value = false
+  if (added) toast(`已添加 ${added} 项`)
+}
 const cartTotal = computed(() => cart.value.reduce((sum, i) => sum + i.unit_price * i.quantity, 0))
 function goStep(i) { if (i <= currentStep.value) currentStep.value = i }
 
