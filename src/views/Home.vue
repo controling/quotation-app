@@ -72,8 +72,8 @@
       <div style="padding:10px 14px">
         <textarea
           v-model="pasteText"
-          placeholder="粘贴样品名称，一行一个或用逗号分隔&#10;&#10;示例：&#10;  八角茴香&#10;  马松子&#10;  亚甲蓝&#10;  八角茴香, 马松子, 亚甲蓝&#10;&#10;输入样品名会自动匹配该样品下所有检测项目&#10;也可粘贴Excel数据"
-          style="width:100%;height:120px;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;resize:vertical;box-sizing:border-box;line-height:1.6;font-family:inherit"
+          placeholder="粘贴样品名称，一行一个或用逗号/分号/空格等分隔&#10;&#10;示例：&#10;  八角茴香&#10;  马松子&#10;  亚甲蓝&#10;  八角茴香, 马松子, 亚甲蓝&#10;&#10;输入样品名会自动匹配该样品下所有检测项目&#10;也可粘贴Excel数据"
+          style="width:100%;height:240px;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;resize:vertical;box-sizing:border-box;line-height:1.6;font-family:inherit"
         ></textarea>
         <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
           <button class="btn btn-ghost btn-sm" @click="pasteFromClipboard">
