@@ -147,7 +147,7 @@
 import { toast } from '../utils/toast'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useDrugItemsStore } from '../stores/drugItems'
-import { drugItemsApi, statsApi } from '../api'
+import { drugItemsApi, statsApi, itemsApi } from '../api'
 import { exportItems } from '../utils/excel'
 import { showConfirmDialog } from 'vant'
 import ImportExcel from '../components/ImportExcel.vue'
@@ -295,8 +295,9 @@ function onSearch() {
   }, 300)
 }
 
-function onExport() {
-  exportItems(filteredGroups.value.flatMap(g => g.items), '药品检测项目')
+async function onExport() {
+  const { data } = await itemsApi.all('drug')
+  exportItems(data.items || [], '药品检测项目')
 }
 
 function openAddDialog() {

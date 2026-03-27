@@ -61,7 +61,7 @@ export function parseExcel(file) {
  */
 export async function exportQuotation(quotation) {
   const wb = new ExcelJS.Workbook()
-  const ws = wb.addWorksheet('Sheet2')
+  const ws = wb.addWorksheet('Sheet')
 
   // Group items by category (sample name)
   const grouped = {}
@@ -118,7 +118,7 @@ export async function exportQuotation(quotation) {
         item.description || ''
       ])
       const row = ws.getRow(ws.rowCount)
-      row.height = 31
+      row.height = 25
       for (let c = 1; c <= 8; c++) {
         const cell = ws.getCell(ws.rowCount, c)
         cell.font = { name: '宋体', size: 11 }
