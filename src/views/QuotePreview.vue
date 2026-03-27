@@ -123,7 +123,6 @@
           </div>
           <div v-if="editForm.items.length === 0" style="text-align:center;padding:16px;color:var(--text-3);font-size:13px">暂无检测项目，请点击下方添加</div>
           <button class="btn btn-ghost btn-sm btn-block" style="margin-top:8px" @click="openSampleSelector">+ 添加样品</button>
-          <button class="btn btn-ghost btn-sm btn-block" style="margin-top:4px" @click="openAddItemForSample('')">+ 添加检测项目</button>
         </div>
       </div>
 
@@ -297,8 +296,7 @@ function openAddItemForSample(sample) {
   cartAddSearch.value = ''
   cartAddItems.value = []
   showCartAddPopup.value = true
-  if (sample) loadSampleItems()
-  else loadAllItems()
+  loadAllItems()
 }
 
 async function loadAllCategories() {
@@ -325,12 +323,7 @@ function filterSampleSelector() {
 
 function selectSampleForEdit(cat) {
   showSampleSelector.value = false
-  cartAddSample.value = cat
-  selectedEditIds.value = new Set()
-  cartAddSearch.value = ''
-  cartAddItems.value = []
-  showCartAddPopup.value = true
-  loadSampleItems()
+  openAddItemForSample(cat)
 }
 // Load items from /api/drug-items/list (grouped by sample)
 async function loadSampleItems() {
