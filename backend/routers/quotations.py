@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Quotation, QuotationType, QuotationStatus
+from models import Quotation, QuotationType, QuotationStatus, now_beijing
 from routers.auth import get_current_user, require_admin
 
 router = APIRouter(prefix="/api/quotations", tags=["quotations"])
@@ -22,6 +22,8 @@ class QuotationCreate(BaseModel):
     quotation_type: str = "drug"
     total_amount: float = 0
     items_json: list = []
+    overall_discount: float = 1
+    sample_discounts: dict = {}
 
 
 class QuotationUpdate(BaseModel):
@@ -33,6 +35,8 @@ class QuotationUpdate(BaseModel):
     total_amount: float | None = None
     status: str | None = None
     items_json: list | None = None
+    overall_discount: float | None = None
+    sample_discounts: dict | None = None
 
 
 class ListParams(BaseModel):
@@ -54,13 +58,15 @@ def q_to_dict(q: Quotation):
         "total": float(q.total_amount) if q.total_amount else 0,
         "status": q.status.value if q.status else "draft",
         "items": q.items_json or [],
+        "overall_discount": float(q.overall_discount) if q.overall_discount else 1,
+        "sample_discounts": q.sample_discounts or {},
         "created_by": q.created_by,
         "created_at": str(q.created_at) if q.created_at else "",
     }
 
 
 def generate_quote_no():
-    return f"QZ{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    return f"QZ{now_beijing().strftime('%Y%m%d%H%M%S')}"
 
 
 @router.post("/list")
@@ -94,6 +100,8 @@ def create_quotation(data: QuotationCreate, db: Session = Depends(get_db), user=
         quotation_type=QuotationType(data.quotation_type),
         total_amount=data.total_amount,
         items_json=data.items_json,
+        overall_discount=data.overall_discount,
+        sample_discounts=data.sample_discounts,
         status=QuotationStatus.draft,
         created_by=user.id,
     )
@@ -126,7 +134,7 @@ def update_quotation(data: QuotationUpdate, db: Session = Depends(get_db), user=
     for key, val in update_data.items():
         setattr(q, key, val)
 
-    q.updated_at = datetime.now()
+    q.updated_at = now_beijing()
     db.commit()
     db.refresh(q)
     return q_to_dict(q)

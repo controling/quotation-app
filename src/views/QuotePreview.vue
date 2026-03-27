@@ -70,11 +70,21 @@
         <div class="m-card-header"><h3>检测项目明细</h3></div>
         <div class="m-card-body" style="padding:8px 14px">
           <div v-for="sample in groupedItems" :key="sample.name" class="view-sample-group" style="margin-bottom:10px">
-            <div class="view-sample-name">{{ sample.name }}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div class="view-sample-name">{{ sample.name }}</div>
+              <div style="text-align:right">
+                <span v-if="getSampleDiscount(sample.name) < 1" style="font-size:11px;color:var(--danger);margin-right:6px">{{ (getSampleDiscount(sample.name) * 10).toFixed(1) }}折</span>
+                <span class="price" style="font-size:14px;font-weight:700">¥{{ getSampleTotal(sample).toFixed(2) }}</span>
+              </div>
+            </div>
             <div v-for="(item, idx) in sample.items" :key="idx" class="view-item">
               <span class="view-item-name">{{ item.name }}</span>
               <span class="view-item-meta">{{ item.method || '-' }} | {{ item.cycle_days || '-' }}天</span>
-              <span class="price">¥{{ item.unit_price }} × {{ item.quantity }}</span>
+              <span style="white-space:nowrap;text-align:right">
+                <span class="price">¥{{ item.unit_price }}</span>
+                <span style="color:var(--text-3);font-size:12px"> × {{ item.quantity || 1 }}</span>
+                <span v-if="item.discount && item.discount < 1" style="color:var(--danger);font-size:11px;margin-left:2px">{{ (item.discount * 10).toFixed(1) }}折</span>
+              </span>
             </div>
           </div>
         </div>
@@ -89,8 +99,15 @@
         <div class="m-card-body" style="padding:8px 14px">
           <div v-for="sample in editSampleGroups" :key="sample.name" style="margin-bottom:8px">
             <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:4px">
-              <span style="font-weight:700;color:var(--primary);font-size:14px">{{ sample.name }}</span>
               <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-weight:700;color:var(--primary);font-size:14px">{{ sample.name }}</span>
+                <div style="display:flex;align-items:center;gap:2px">
+                  <input class="form-input" type="number" :value="getEditSampleDiscount(sample.name)" @input="e => setEditSampleDiscount(sample.name, e.target.value)" step="0.1" placeholder="1" style="width:50px;height:24px;font-size:11px;text-align:center;padding:0 4px" />
+                  <span style="font-size:10px;color:var(--text-3)">折</span>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="price" style="font-size:13px">¥{{ getEditSampleTotal(sample).toFixed(2) }}</span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" width="18" height="18" style="cursor:pointer" @click="openAddItemForSample(sample.name)">
                   <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
@@ -112,11 +129,12 @@
               <div class="cart-item-right">
                 <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
                   <span style="font-size:11px;color:var(--text-3)">单价</span>
-                  <input class="form-input" type="number" v-model.number="item.unit_price" style="width:70px;height:28px;font-size:13px;text-align:right;padding:0 6px" />
+                  <input class="form-input" type="number" v-model.number="item.unit_price" style="width:60px;height:28px;font-size:13px;text-align:right;padding:0 4px" />
+                  <input class="form-input" type="number" v-model.number="item.discount" step="0.1" placeholder="1" style="width:44px;height:28px;font-size:12px;text-align:center;padding:0 2px" title="折扣" />
                 </div>
                 <div style="display:flex;align-items:center;justify-content:space-between">
                   <van-stepper v-model="item.quantity" :min="1" :max="99" theme="round" button-size="20" />
-                  <span class="price" style="min-width:65px;text-align:right">¥{{ (item.unit_price * item.quantity).toFixed(2) }}</span>
+                  <span class="price" style="min-width:65px;text-align:right">¥{{ itemLineTotal(item).toFixed(2) }}</span>
                 </div>
               </div>
             </div>
@@ -128,9 +146,22 @@
 
       <!-- Total -->
       <div class="m-card">
-        <div class="m-card-body" style="display:flex;align-items:center;justify-content:space-between;padding:16px">
-          <span style="font-size:15px;font-weight:600;color:var(--text-2)">合计金额</span>
-          <span class="price" style="font-size:22px;font-weight:800">¥{{ Number(editing ? editTotal : quotation.total).toFixed(2) }}</span>
+        <div class="m-card-body" style="padding:16px">
+          <div v-if="editing" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+            <span style="font-size:13px;color:var(--text-2)">总折扣</span>
+            <div style="display:flex;align-items:center;gap:4px">
+              <input class="form-input" type="number" v-model.number="editForm.overall_discount" step="0.1" placeholder="1" style="width:60px;height:30px;font-size:14px;text-align:center;padding:0 4px" />
+              <span style="font-size:13px;color:var(--text-3)">折</span>
+            </div>
+          </div>
+          <div v-if="editing && editForm.overall_discount < 1" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:13px;color:var(--text-3)">折扣前</span>
+            <span style="font-size:14px;color:var(--text-3);text-decoration:line-through">¥{{ editSubtotal.toFixed(2) }}</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:15px;font-weight:600;color:var(--text-2)">合计金额</span>
+            <span class="price" style="font-size:22px;font-weight:800">¥{{ finalTotal.toFixed(2) }}</span>
+          </div>
         </div>
       </div>
 
@@ -272,7 +303,7 @@ const packagingStore = usePackagingItemsStore()
 const loading = ref(true)
 const quotation = ref(null)
 const editing = ref(false)
-const editForm = ref({ customer_name: '', contact_person: '', items: [] })
+const editForm = ref({ customer_name: '', contact_person: '', items: [], overall_discount: 1, sample_discounts: {} })
 
 const showSearch = ref(false)
 const searchText = ref('')
@@ -304,9 +335,64 @@ const editSampleGroups = computed(() => {
   editForm.value.items.forEach(item => {
     const cat = item.category || '未分类'
     if (!map[cat]) map[cat] = { name: cat, items: [] }
+    if (!item.discount) item.discount = 1
     map[cat].items.push(item)
   })
   return Object.values(map)
+})
+
+// Item line total with discount
+function itemLineTotal(item) {
+  const d = item.discount && item.discount > 0 && item.discount <= 1 ? item.discount : 1
+  return item.unit_price * (item.quantity || 1) * d
+}
+
+// Sample discount helpers (edit mode)
+function getEditSampleDiscount(name) {
+  return editForm.value.sample_discounts?.[name] ?? 1
+}
+function setEditSampleDiscount(name, val) {
+  if (!editForm.value.sample_discounts) editForm.value.sample_discounts = {}
+  const v = parseFloat(val)
+  editForm.value.sample_discounts[name] = (v > 0 && v <= 1) ? v : 1
+}
+function getEditSampleTotal(sample) {
+  const itemsTotal = sample.items.reduce((s, i) => s + itemLineTotal(i), 0)
+  const sd = getEditSampleDiscount(sample.name)
+  return itemsTotal * (sd > 0 && sd <= 1 ? sd : 1)
+}
+
+// Subtotal before overall discount
+const editSubtotal = computed(() => {
+  return editSampleGroups.value.reduce((sum, s) => sum + getEditSampleTotal(s), 0)
+})
+
+// Final total with overall discount
+const editTotal = computed(() => {
+  const od = editForm.value.overall_discount && editForm.value.overall_discount > 0 && editForm.value.overall_discount <= 1 ? editForm.value.overall_discount : 1
+  return editSubtotal.value * od
+})
+
+// View mode helpers
+function getSampleDiscount(name) {
+  return quotation.value?.sample_discounts?.[name] ?? 1
+}
+function getSampleTotal(sample) {
+  const itemsTotal = sample.items.reduce((s, i) => {
+    const d = i.discount && i.discount > 0 && i.discount <= 1 ? i.discount : 1
+    return s + i.unit_price * (i.quantity || 1) * d
+  }, 0)
+  const sd = getSampleDiscount(sample.name)
+  return itemsTotal * (sd > 0 && sd <= 1 ? sd : 1)
+}
+const finalTotal = computed(() => {
+  if (editing.value) return editTotal.value
+  if (!quotation.value) return 0
+  // View mode: compute from items with discounts
+  const grouped = groupedItems.value
+  const subtotal = grouped.reduce((sum, s) => sum + getSampleTotal(s), 0)
+  const od = quotation.value.overall_discount && quotation.value.overall_discount > 0 && quotation.value.overall_discount <= 1 ? quotation.value.overall_discount : 1
+  return subtotal * od
 })
 
 function removeEditItem(id) {
@@ -393,7 +479,7 @@ function addSelectedFromSelector() {
   let added = 0
   for (const item of items) {
     if (!editForm.value.items.find(c => c.id === item.id)) {
-      editForm.value.items.push({ id: item.id, name: item.name, category: item.category, standard: item.standard, method: item.method, unit_price: item.unit_price, quantity: 1, cma: item.cma, cnas: item.cnas, cycle_days: item.cycle_days, description: item.description })
+      editForm.value.items.push({ id: item.id, name: item.name, category: item.category, standard: item.standard, method: item.method, unit_price: item.unit_price, quantity: 1, discount: 1, cma: item.cma, cnas: item.cnas, cycle_days: item.cycle_days, description: item.description })
       added++
     }
   }
@@ -422,7 +508,7 @@ function addItemsToEdit() {
   let added = 0
   for (const item of items) {
     if (!editForm.value.items.find(c => c.id === item.id)) {
-      editForm.value.items.push({ id: item.id, name: item.name, category: targetSample || item.category, standard: item.standard, method: item.method, unit_price: item.unit_price, quantity: 1, cma: item.cma, cnas: item.cnas, cycle_days: item.cycle_days, description: item.description })
+      editForm.value.items.push({ id: item.id, name: item.name, category: targetSample || item.category, standard: item.standard, method: item.method, unit_price: item.unit_price, quantity: 1, discount: 1, cma: item.cma, cnas: item.cnas, cycle_days: item.cycle_days, description: item.description })
       added++
     }
   }
@@ -457,13 +543,13 @@ const groupedItems = computed(() => {
   return Object.values(map)
 })
 
-const editTotal = computed(() => editForm.value.items.reduce((sum, i) => sum + (i.unit_price * i.quantity), 0))
-
 function startEdit() {
   editForm.value = {
     customer_name: quotation.value.customer_name || '',
     contact_person: quotation.value.contact_person || '',
-    items: quotation.value.items.map(i => ({ ...i }))
+    items: quotation.value.items.map(i => ({ ...i, discount: i.discount ?? 1 })),
+    overall_discount: quotation.value.overall_discount ?? 1,
+    sample_discounts: quotation.value.sample_discounts ? { ...quotation.value.sample_discounts } : {}
   }
   showCartAddPopup.value = false
   editing.value = true
@@ -478,11 +564,13 @@ async function onSave() {
       contact_person: editForm.value.contact_person,
       sample_name: sampleNames,
       total_amount: editTotal.value,
+      overall_discount: editForm.value.overall_discount || 1,
+      sample_discounts: editForm.value.sample_discounts || {},
       items_json: editForm.value.items.map(i => ({
         id: i.id, name: i.name, category: i.category, standard: i.standard,
         method: i.method, unit_price: i.unit_price, quantity: i.quantity,
-        subtotal: i.unit_price * i.quantity, cma: i.cma, cnas: i.cnas,
-        cycle_days: i.cycle_days, description: i.description
+        discount: i.discount || 1, subtotal: itemLineTotal(i),
+        cma: i.cma, cnas: i.cnas, cycle_days: i.cycle_days, description: i.description
       }))
     }
     const { data } = await quotationsApi.update({ item_id: quotation.value.id, ...payload })

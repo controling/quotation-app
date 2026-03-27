@@ -1,5 +1,10 @@
 import enum
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+beijing_tz = timezone(timedelta(hours=8))
+
+def now_beijing():
+    return datetime.now(beijing_tz).replace(tzinfo=None)
 from sqlalchemy import (
     Column, Integer, String, Text, Boolean, DECIMAL,
     DateTime, Enum, JSON, ForeignKey
@@ -34,8 +39,8 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), default=UserRole.user)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=now_beijing)
+    updated_at = Column(DateTime, default=now_beijing, onupdate=now_beijing)
 
 
 class DrugItem(Base):
@@ -83,6 +88,8 @@ class Quotation(Base):
     total_amount = Column(DECIMAL(12, 2), default=0)
     status = Column(Enum(QuotationStatus), default=QuotationStatus.draft)
     items_json = Column(JSON)
+    overall_discount = Column(DECIMAL(5, 4), default=1)
+    sample_discounts = Column(JSON, default=dict)
     created_by = Column(Integer, ForeignKey("users.id"))
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=now_beijing)
+    updated_at = Column(DateTime, default=now_beijing, onupdate=now_beijing)

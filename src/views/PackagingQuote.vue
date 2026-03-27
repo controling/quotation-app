@@ -88,8 +88,15 @@
           <div class="m-card-body" style="padding:8px 14px">
             <div v-for="sample in cartSamples" :key="sample" style="margin-bottom:8px">
               <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:4px">
-                <span style="font-weight:700;color:var(--accent);font-size:14px;word-break:break-all;line-height:1.4">{{ sample }}</span>
-                <div style="display:flex;align-items:center;gap:8px">
+                <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">
+                  <span style="font-weight:700;color:var(--accent);font-size:14px;word-break:break-all;line-height:1.4">{{ sample }}</span>
+                  <div style="display:flex;align-items:center;gap:2px;flex-shrink:0">
+                    <input class="form-input" type="number" :value="getSampleDiscount(sample)" @input="e => setSampleDiscount(sample, e.target.value)" step="0.1" placeholder="1" style="width:46px;height:24px;font-size:11px;text-align:center;padding:0 3px" />
+                    <span style="font-size:10px;color:var(--text-3)">折</span>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                  <span class="price" style="font-size:13px">¥{{ getSampleCartTotal(sample).toFixed(2) }}</span>
                   <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" width="18" height="18" style="cursor:pointer" @click="openAddItemForSample(sample)">
                     <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                   </svg>
@@ -111,18 +118,32 @@
                 <div class="cart-item-right">
                   <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
                     <span style="font-size:11px;color:var(--text-3)">单价</span>
-                    <input class="form-input" type="number" v-model.number="item.unit_price" style="width:70px;height:28px;font-size:13px;text-align:right;padding:0 6px" />
+                    <input class="form-input" type="number" v-model.number="item.unit_price" style="width:60px;height:28px;font-size:13px;text-align:right;padding:0 4px" />
+                    <input class="form-input" type="number" v-model.number="item.discount" step="0.1" placeholder="1" style="width:44px;height:28px;font-size:12px;text-align:center;padding:0 2px" title="折扣" />
                   </div>
                   <div style="display:flex;align-items:center;justify-content:space-between">
                     <van-stepper v-model="item.quantity" :min="1" :max="99" theme="round" button-size="20" />
-                    <span class="price" style="min-width:65px;text-align:right">¥{{ item.unit_price * item.quantity }}</span>
+                    <span class="price" style="min-width:65px;text-align:right">¥{{ itemLineTotal(item).toFixed(2) }}</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-          <div style="padding:0 14px 12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;padding-top:12px">
-            <span style="font-size:15px">合计: <b class="price" style="font-size:20px">¥{{ cartTotal.toFixed(2) }}</b></span>
+          <div style="padding:0 14px 12px;border-top:1px solid var(--border);padding-top:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <span style="font-size:13px;color:var(--text-2)">总折扣</span>
+              <div style="display:flex;align-items:center;gap:4px">
+                <input class="form-input" type="number" v-model.number="overallDiscount" step="0.1" placeholder="1" style="width:60px;height:30px;font-size:14px;text-align:center;padding:0 4px" />
+                <span style="font-size:13px;color:var(--text-3)">折</span>
+              </div>
+            </div>
+            <div v-if="overallDiscount < 1" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+              <span style="font-size:13px;color:var(--text-3)">折扣前</span>
+              <span style="font-size:14px;color:var(--text-3);text-decoration:line-through">¥{{ cartSubtotal.toFixed(2) }}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:15px">合计: <b class="price" style="font-size:20px">¥{{ cartTotal.toFixed(2) }}</b></span>
+            </div>
           </div>
         </div>
         <button class="btn btn-ghost btn-sm btn-block" style="margin-top:8px" @click="currentStep = 1">+ 添加样品</button>
@@ -355,7 +376,7 @@ function addSelectedToCart() {
   let added = 0
   for (const item of items) {
     if (!cart.value.find(c => c.id === item.id)) {
-      cart.value.push({ id: item.id, name: item.name, category: item.category, standard: item.standard, method: item.method, unit_price: item.unit_price, quantity: 1, cma: item.cma, cnas: item.cnas, cycle_days: item.cycle_days, description: item.description })
+      cart.value.push({ id: item.id, name: item.name, category: item.category, standard: item.standard, method: item.method, unit_price: item.unit_price, quantity: 1, discount: 1, cma: item.cma, cnas: item.cnas, cycle_days: item.cycle_days, description: item.description })
       added++
     }
   }
@@ -402,14 +423,37 @@ function addItemsToCartSample() {
   let added = 0
   for (const item of items) {
     if (!cart.value.find(c => c.id === item.id)) {
-      cart.value.push({ id: item.id, name: item.name, category: targetSample, standard: item.standard, method: item.method, unit_price: item.unit_price, quantity: 1, cma: item.cma, cnas: item.cnas, cycle_days: item.cycle_days, description: item.description })
+      cart.value.push({ id: item.id, name: item.name, category: targetSample, standard: item.standard, method: item.method, unit_price: item.unit_price, quantity: 1, discount: 1, cma: item.cma, cnas: item.cnas, cycle_days: item.cycle_days, description: item.description })
       added++
     }
   }
   showCartAddPopup.value = false
   if (added) toast(`已添加 ${added} 项到「${targetSample}」`)
 }
-const cartTotal = computed(() => cart.value.reduce((sum, i) => sum + i.unit_price * i.quantity, 0))
+const cartSubtotal = computed(() => {
+  return cartSamples.value.reduce((sum, s) => sum + getSampleCartTotal(s), 0)
+})
+const cartTotal = computed(() => {
+  const od = overallDiscount.value > 0 && overallDiscount.value <= 1 ? overallDiscount.value : 1
+  return cartSubtotal.value * od
+})
+
+// Discount logic
+const sampleDiscounts = ref({})
+const overallDiscount = ref(1)
+
+function itemLineTotal(item) {
+  const d = item.discount && item.discount > 0 && item.discount <= 1 ? item.discount : 1
+  return item.unit_price * (item.quantity || 1) * d
+}
+function getSampleDiscount(name) { return sampleDiscounts.value[name] ?? 1 }
+function setSampleDiscount(name, val) { const v = parseFloat(val); sampleDiscounts.value[name] = (v > 0 && v <= 1) ? v : 1 }
+function getSampleCartTotal(name) {
+  const items = getCartItemsBySample(name)
+  const itemsTotal = items.reduce((s, i) => s + itemLineTotal(i), 0)
+  const sd = getSampleDiscount(name)
+  return itemsTotal * (sd > 0 && sd <= 1 ? sd : 1)
+}
 function goStep(i) { if (i <= currentStep.value) currentStep.value = i }
 
 async function onGenerate() {
@@ -417,7 +461,9 @@ async function onGenerate() {
   const payload = {
     title: customerName.value, customer_name: customerName.value, contact_person: contactPerson.value,
     sample_name: cartSamples.value.join('、'), quotation_type: 'packaging', total_amount: cartTotal.value,
-    items_json: cart.value.map(i => ({ id: i.id, name: i.name, category: i.category, standard: i.standard, method: i.method, unit_price: i.unit_price, quantity: i.quantity, subtotal: i.unit_price * i.quantity, cma: i.cma, cnas: i.cnas, cycle_days: i.cycle_days, description: i.description }))
+    overall_discount: overallDiscount.value,
+    sample_discounts: { ...sampleDiscounts.value },
+    items_json: cart.value.map(i => ({ id: i.id, name: i.name, category: i.category, standard: i.standard, method: i.method, unit_price: i.unit_price, quantity: i.quantity, discount: i.discount || 1, subtotal: itemLineTotal(i), cma: i.cma, cnas: i.cnas, cycle_days: i.cycle_days, description: i.description }))
   }
   try {
     const q = await quoteStore.createQuotationDirect(payload)

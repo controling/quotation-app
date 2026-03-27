@@ -29,7 +29,7 @@ def _split_search(search: str) -> list[str]:
 
 
 def _apply_search(q, Model, search: str):
-    """对查询应用多关键词搜索（OR 逻辑）"""
+    """对查询应用多关键词搜索（OR 逻辑），忽略大小写"""
     terms = _split_search(search)
     if not terms:
         return q
@@ -38,10 +38,11 @@ def _apply_search(q, Model, search: str):
         like = f"%{term}%"
         conditions.append(
             or_(
-                Model.name.like(like),
-                Model.category.like(like),
-                Model.standard.like(like),
-                Model.method.like(like),
+                Model.name.ilike(like),
+                Model.category.ilike(like),
+                Model.standard.ilike(like),
+                Model.method.ilike(like),
+                Model.description.ilike(like),
             )
         )
     return q.filter(or_(*conditions))
@@ -76,7 +77,7 @@ def list_all_items(params: ItemsListParams, db: Session = Depends(get_db), user=
         q = _apply_search(q, Model, params.search)
 
     total = q.count()
-    page_size = min(params.page_size, 100)
+    page_size = min(params.page_size, 500) if params.search else min(params.page_size, 100)
     items = q.order_by(Model.category, Model.id).offset((params.page - 1) * page_size).limit(page_size).all()
 
     return {

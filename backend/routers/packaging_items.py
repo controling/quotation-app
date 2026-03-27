@@ -73,7 +73,7 @@ def list_items(params: ListParams, db: Session = Depends(get_db), user=Depends(g
             conds = []
             for term in terms:
                 like = f"%{term}%"
-                conds.append(or_(PackagingItem.name.like(like), PackagingItem.category.like(like), PackagingItem.standard.like(like)))
+                conds.append(or_(PackagingItem.name.ilike(like), PackagingItem.category.ilike(like), PackagingItem.standard.ilike(like), PackagingItem.method.ilike(like), PackagingItem.description.ilike(like)))
             q = q.filter(or_(*conds))
 
     all_items = q.order_by(PackagingItem.category, PackagingItem.id).all()
