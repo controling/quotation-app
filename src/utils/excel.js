@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 
 /**
  * 解析 Excel 文件为项目数组
@@ -56,10 +57,11 @@ export function parseExcel(file) {
 }
 
 /**
- * 导出报价单 - 委托检测报价表模板（与益生报价模板一致）
+ * 导出报价单 - 委托检测报价表模板（完全匹配益生报价模板样式）
  */
-export function exportQuotation(quotation) {
-  const wb = XLSX.utils.book_new()
+export async function exportQuotation(quotation) {
+  const wb = new ExcelJS.Workbook()
+  const ws = wb.addWorksheet('Sheet2')
 
   // Group items by category (sample name)
   const grouped = {}
@@ -69,30 +71,43 @@ export function exportQuotation(quotation) {
     grouped[sample].push(item)
   })
 
-  // Build rows
-  // Row 0 (index 0): Title
-  // Row 1 (index 1): Headers
-  // Row 2+ (index 2+): Data
+  // Column widths (matching template)
+  ws.getColumn(1).width = 10.63  // 序号
+  ws.getColumn(2).width = 22.63  // 品名
+  ws.getColumn(3).width = 28.0   // 检测项目
+  ws.getColumn(4).width = 23.25  // 检测方法
+  ws.getColumn(5).width = 15.63  // 协议价
+  ws.getColumn(6).width = 10.63  // 周期
+  ws.getColumn(7).width = 16.5   // 资质
+  ws.getColumn(8).width = 33.13  // 备注
+
+  // Row 1: Title
+  ws.addRow(['委托检测报价表'])
+  ws.getRow(1).height = 79
+  ws.mergeCells('A1:H1')
+  const titleCell = ws.getCell('A1')
+  titleCell.font = { name: '宋体', size: 28, bold: true }
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' }
+
+  // Row 2: Headers
   const headers = ['序号', '品名', '检测项目', '检测方法', '协议价（元）', '周期（工作日）', '资质', '备注']
-  const data = []
-  const merges = []
-
-  // Title row
-  const titleRow = ['委托检测报价表']
-  data.push(titleRow)
-
-  // Header row
-  data.push(headers)
+  ws.addRow(headers)
+  ws.getRow(2).height = 31
+  for (let c = 1; c <= 8; c++) {
+    const cell = ws.getCell(2, c)
+    cell.font = { name: '宋体', size: 11 }
+    cell.alignment = { horizontal: 'center', vertical: 'middle' }
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD6E4F0' } }
+    cell.border = { bottom: { style: 'thin', color: { argb: 'FF000000' } } }
+  }
 
   // Data rows
   let seqNo = 0
-  let dataStartRow = 2 // 0-indexed row where data starts
-
   for (const [sampleName, items] of Object.entries(grouped)) {
-    const sampleStartRow = dataStartRow
+    const sampleStartRow = ws.rowCount + 1
     items.forEach((item, idx) => {
       const qual = [item.cma ? 'CMA' : '', item.cnas ? 'CNAS' : ''].filter(Boolean).join(', ') || '-'
-      data.push([
+      ws.addRow([
         idx === 0 ? ++seqNo : null,
         idx === 0 ? sampleName : null,
         item.name,
@@ -102,44 +117,37 @@ export function exportQuotation(quotation) {
         qual,
         item.description || ''
       ])
-      dataStartRow++
+      const row = ws.getRow(ws.rowCount)
+      row.height = 31
+      for (let c = 1; c <= 8; c++) {
+        const cell = ws.getCell(ws.rowCount, c)
+        cell.font = { name: '宋体', size: 11 }
+        cell.alignment = { vertical: 'middle' }
+        // Center align 序号, 周期, 资质
+        if (c === 1 || c === 6 || c === 7) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' }
+        }
+      }
     })
-    // Merge 序号 and 品名 cells for multi-item samples
+    // Merge 序号 and 品名列 for multi-item samples
     if (items.length > 1) {
-      // 序号 column (A)
-      merges.push({ s: { r: sampleStartRow, c: 0 }, e: { r: sampleStartRow + items.length - 1, c: 0 } })
-      // 品名列 (B)
-      merges.push({ s: { r: sampleStartRow, c: 1 }, e: { r: sampleStartRow + items.length - 1, c: 1 } })
+      ws.mergeCells(sampleStartRow, 1, sampleStartRow + items.length - 1, 1)
+      ws.mergeCells(sampleStartRow, 2, sampleStartRow + items.length - 1, 2)
+      // Center align merged cells
+      ws.getCell(sampleStartRow, 1).alignment = { horizontal: 'center', vertical: 'middle' }
+      ws.getCell(sampleStartRow, 2).alignment = { horizontal: 'center', vertical: 'middle' }
     }
   }
 
-  // Title merge: A1:H1 (row 0, col 0 to col 7)
-  merges.unshift({ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } })
-
-  const ws = XLSX.utils.aoa_to_sheet(data)
-  ws['!merges'] = merges
-
-  // Column widths matching template
-  ws['!cols'] = [
-    { wch: 10.63 },  // A 序号
-    { wch: 22.63 },  // B 品名
-    { wch: 28.0 },   // C 检测项目
-    { wch: 23.25 },  // D 检测方法
-    { wch: 15.63 },  // E 协议价
-    { wch: 10.63 },  // F 周期
-    { wch: 16.5 },   // G 资质
-    { wch: 33.13 },  // H 备注
-  ]
-
-  // Row heights
-  const totalRows = data.length
-  ws['!rows'] = [{ hpt: 79 }] // Title row height
-  for (let i = 1; i < totalRows; i++) {
-    ws['!rows'][i] = { hpt: 31 }
-  }
-
-  XLSX.utils.book_append_sheet(wb, ws, 'Sheet2')
-  XLSX.writeFile(wb, `${quotation.quote_no}.xlsx`)
+  // Save
+  const buffer = await wb.xlsx.writeBuffer()
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${quotation.quote_no}.xlsx`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 /**

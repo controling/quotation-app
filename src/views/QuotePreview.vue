@@ -497,9 +497,9 @@ async function onSave() {
 function statusText(s) { return { draft: '草稿', confirmed: '已确认', sent: '已发送' }[s] || s }
 function statusBadge(s) { return { draft: 'badge-gray', confirmed: 'badge-green', sent: 'badge-blue' }[s] || 'badge-gray' }
 
-function onExport() {
+async function onExport() {
   if (!quotation.value) return
-  exportQuotation(quotation.value)
+  await exportQuotation(quotation.value)
   toast('导出成功')
 }
 
