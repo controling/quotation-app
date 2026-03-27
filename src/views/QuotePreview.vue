@@ -297,7 +297,8 @@ function openAddItemForSample(sample) {
   cartAddSearch.value = ''
   cartAddItems.value = []
   showCartAddPopup.value = true
-  loadCartAddItems()
+  if (sample) loadSampleItems()
+  else loadAllItems()
 }
 
 async function loadAllCategories() {
@@ -330,28 +331,37 @@ function selectSampleForEdit(cat) {
   cartAddSearch.value = ''
   cartAddItems.value = []
   showCartAddPopup.value = true
-  loadCartAddItems()
+  loadSampleItems()
 }
-async function loadCartAddItems() {
+// Load items from /api/drug-items/list (grouped by sample)
+async function loadSampleItems() {
   try {
     const itemType = quotation.value?.type === 'packaging' ? 'packaging' : 'drug'
-    const { data } = await itemsApi.all(itemType)
+    const api = itemType === 'packaging' ? packagingItemsApi : drugItemsApi
     const existingIds = new Set(editForm.value.items.map(i => i.id))
-    let items = (data.items || []).filter(i => !existingIds.has(i.id))
-    // Filter by sample when a specific sample is selected
-    if (cartAddSample.value) {
-      items = items.filter(i => i.category === cartAddSample.value)
+    let items = []
+    const { data } = await api.list({ search: cartAddSearch.value, page: 1, page_size: 200 })
+    for (const s of (data.samples || [])) {
+      if (cartAddSample.value && s.sample !== cartAddSample.value) continue
+      items.push(...s.items)
     }
-    if (cartAddSearch.value) {
-      const q = cartAddSearch.value.toLowerCase()
-      items = items.filter(i => i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q))
-    }
-    cartAddItems.value = items
+    cartAddItems.value = items.filter(i => !existingIds.has(i.id))
   } catch {}
 }
+
+// Load items from /api/items/list (flat list, all items)
+async function loadAllItems() {
+  try {
+    const itemType = quotation.value?.type === 'packaging' ? 'packaging' : 'drug'
+    const existingIds = new Set(editForm.value.items.map(i => i.id))
+    const { data } = await itemsApi.list({ type: itemType, search: cartAddSearch.value, page: 1, page_size: 200 })
+    cartAddItems.value = (data.items || []).filter(i => !existingIds.has(i.id))
+  } catch {}
+}
+
 function onCartAddSearch() {
   clearTimeout(cartAddTimer)
-  cartAddTimer = setTimeout(() => loadCartAddItems(), 300)
+  cartAddTimer = setTimeout(() => cartAddSample.value ? loadSampleItems() : loadAllItems(), 300)
 }
 
 const cartAddSampleGroups = computed(() => {
