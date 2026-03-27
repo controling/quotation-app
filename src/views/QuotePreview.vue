@@ -154,11 +154,14 @@
       </div>
     </div>
 
-    <!-- Sample selector popup -->
+    <!-- Sample selector popup (tree: sample → items with checkboxes) -->
     <van-popup v-model:show="showSampleSelector" position="bottom" round :style="{ maxHeight: '85%' }">
       <div class="popup-wrap">
         <div class="popup-header">
-          <div><h3>选择样品</h3></div>
+          <div>
+            <h3>添加检测项目</h3>
+            <span class="popup-sub">共 {{ selectorTotal }} 项</span>
+          </div>
           <div class="sheet-close" @click="showSampleSelector = false">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </div>
@@ -166,15 +169,40 @@
         <div style="padding:0 14px 8px">
           <div class="m-search-bar" style="height:36px">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" placeholder="搜索样品名称..." v-model="sampleSelectorSearch" @input="filterSampleSelector" />
+            <input type="text" placeholder="搜索样品名称或检测项目..." v-model="sampleSelectorSearch" @input="filterSampleSelector" />
           </div>
         </div>
+        <div class="popup-actions">
+          <button class="btn btn-sm btn-ghost" @click="selectAllSelector">全选</button>
+          <button class="btn btn-sm btn-ghost" @click="selectedSelectorIds = new Set()">取消全选</button>
+          <button class="btn btn-sm btn-primary" @click="addSelectedFromSelector">加入 ({{ selectedSelectorIds.size }})</button>
+        </div>
         <div class="popup-items">
-          <div v-for="cat in sampleSelectorList" :key="cat" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;border-bottom:1px solid #f5f5f7" @click="selectSampleForEdit(cat)">
-            <div style="font-weight:600;font-size:14px">{{ cat }}</div>
-            <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2" width="18" height="18"><path d="M9 18l6-6-6-6"/></svg>
+          <div v-for="group in sampleSelectorGroups" :key="group.sample" style="border-bottom:1px solid var(--border)">
+            <!-- Sample header (parent) -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;cursor:pointer" @click="toggleSampleExpand(group.sample)">
+              <div style="display:flex;align-items:center;gap:6px">
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" width="14" height="14" :style="{ transform: expandedSelectorSample === group.sample ? 'rotate(90deg)' : '', transition: 'transform .2s' }"><path d="M9 18l6-6-6-6"/></svg>
+                <span style="font-weight:600;font-size:13px;color:var(--primary)">{{ group.sample }}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:11px;color:var(--text-3)">{{ group.items.length }}项</span>
+                <van-checkbox :model-value="isSampleAllSelected(group)" @update:model-value="v => toggleSampleAll(group, v)" @click.stop />
+              </div>
+            </div>
+            <!-- Child items -->
+            <div v-if="expandedSelectorSample === group.sample">
+              <div v-for="item in group.items" :key="item.id" style="display:flex;align-items:center;justify-content:space-between;padding:5px 12px 5px 36px;cursor:pointer;border-top:1px solid #f5f5f7" @click="toggleSelectorItem(item.id)">
+                <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1">
+                  <van-checkbox :model-value="selectedSelectorIds.has(item.id)" @click.stop />
+                  <span style="font-size:13px">{{ item.name }}</span>
+                  <span style="font-size:11px;color:var(--text-3);white-space:nowrap">{{ item.method || '-' }}</span>
+                </div>
+                <span class="price" style="font-size:13px;white-space:nowrap">¥{{ item.unit_price }}</span>
+              </div>
+            </div>
           </div>
-          <div v-if="sampleSelectorList.length === 0 && !sampleSelectorLoading" style="text-align:center;padding:20px;color:var(--text-3)">无数据</div>
+          <div v-if="sampleSelectorGroups.length === 0 && !sampleSelectorLoading" style="text-align:center;padding:20px;color:var(--text-3)">无数据</div>
           <div v-if="sampleSelectorLoading" style="text-align:center;padding:16px"><van-loading size="20px">加载中...</van-loading></div>
         </div>
       </div>
@@ -265,9 +293,11 @@ let cartAddTimer = null
 // Sample selector
 const showSampleSelector = ref(false)
 const sampleSelectorSearch = ref('')
-const sampleSelectorList = ref([])
+const sampleSelectorGroups = ref([])
 const sampleSelectorLoading = ref(false)
-const allSampleCategories = ref([])
+const selectedSelectorIds = ref(new Set())
+const expandedSelectorSample = ref('')
+const selectorTotal = ref(0)
 
 const editSampleGroups = computed(() => {
   const map = {}
@@ -295,31 +325,78 @@ function openAddItemForSample(sample) {
   loadAllItems()
 }
 
-async function loadAllCategories() {
+async function loadSelectorSamples() {
   if (sampleSelectorLoading.value) return
   sampleSelectorLoading.value = true
   const itemType = quotation.value?.type === 'packaging' ? 'packaging' : 'drug'
   try {
     const api = itemType === 'packaging' ? packagingItemsApi : drugItemsApi
     const { data } = await api.list({ page: 1, page_size: 20, search: sampleSelectorSearch.value })
-    allSampleCategories.value = (data.samples || []).map(s => s.sample)
-    sampleSelectorList.value = allSampleCategories.value
+    const existingIds = new Set(editForm.value.items.map(i => i.id))
+    sampleSelectorGroups.value = (data.samples || []).map(s => ({
+      sample: s.sample,
+      items: (s.items || []).filter(i => !existingIds.has(i.id))
+    })).filter(s => s.items.length > 0)
+    selectorTotal.value = data.total || 0
   } catch {} finally { sampleSelectorLoading.value = false }
 }
 
 function openSampleSelector() {
   sampleSelectorSearch.value = ''
+  selectedSelectorIds.value = new Set()
+  expandedSelectorSample.value = ''
   showSampleSelector.value = true
-  loadAllCategories()
+  loadSelectorSamples()
 }
 
 function filterSampleSelector() {
-  loadAllCategories()
+  loadSelectorSamples()
 }
 
-function selectSampleForEdit(cat) {
+function toggleSampleExpand(sample) {
+  expandedSelectorSample.value = expandedSelectorSample.value === sample ? '' : sample
+}
+
+function isSampleAllSelected(group) {
+  return group.items.every(i => selectedSelectorIds.value.has(i.id))
+}
+
+function toggleSampleAll(group, forceVal) {
+  const allSel = isSampleAllSelected(group)
+  const shouldSel = forceVal !== undefined ? forceVal : !allSel
+  for (const item of group.items) {
+    if (shouldSel) selectedSelectorIds.value.add(item.id)
+    else selectedSelectorIds.value.delete(item.id)
+  }
+  selectedSelectorIds.value = new Set(selectedSelectorIds.value)
+}
+
+function toggleSelectorItem(id) {
+  if (selectedSelectorIds.value.has(id)) selectedSelectorIds.value.delete(id)
+  else selectedSelectorIds.value.add(id)
+  selectedSelectorIds.value = new Set(selectedSelectorIds.value)
+}
+
+function selectAllSelector() {
+  const ids = new Set()
+  for (const group of sampleSelectorGroups.value) {
+    for (const item of group.items) ids.add(item.id)
+  }
+  selectedSelectorIds.value = ids
+}
+
+function addSelectedFromSelector() {
+  const allItems = sampleSelectorGroups.value.flatMap(g => g.items)
+  const items = allItems.filter(i => selectedSelectorIds.value.has(i.id))
+  let added = 0
+  for (const item of items) {
+    if (!editForm.value.items.find(c => c.id === item.id)) {
+      editForm.value.items.push({ id: item.id, name: item.name, category: item.category, standard: item.standard, method: item.method, unit_price: item.unit_price, quantity: 1, cma: item.cma, cnas: item.cnas, cycle_days: item.cycle_days, description: item.description })
+      added++
+    }
+  }
   showSampleSelector.value = false
-  openAddItemForSample(cat)
+  if (added) toast(`已添加 ${added} 项`)
 }
 // Load items from /api/items/list (flat list, all items)
 async function loadAllItems() {
