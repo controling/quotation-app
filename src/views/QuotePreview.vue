@@ -302,26 +302,25 @@ function openAddItemForSample(sample) {
 }
 
 async function loadAllCategories() {
-  if (allSampleCategories.value.length > 0) return
+  if (sampleSelectorLoading.value) return
+  sampleSelectorLoading.value = true
   const itemType = quotation.value?.type === 'packaging' ? 'packaging' : 'drug'
   try {
     const api = itemType === 'packaging' ? packagingItemsApi : drugItemsApi
-    const { data } = await api.categories()
-    allSampleCategories.value = data.all || data.majors || []
-  } catch {}
+    const { data } = await api.list({ page: 1, page_size: 20, search: sampleSelectorSearch.value })
+    allSampleCategories.value = (data.samples || []).map(s => s.sample)
+    sampleSelectorList.value = allSampleCategories.value
+  } catch {} finally { sampleSelectorLoading.value = false }
 }
 
 function openSampleSelector() {
   sampleSelectorSearch.value = ''
   showSampleSelector.value = true
-  loadAllCategories().then(() => filterSampleSelector())
+  loadAllCategories()
 }
 
 function filterSampleSelector() {
-  const q = sampleSelectorSearch.value.trim().toLowerCase()
-  let list = allSampleCategories.value
-  if (q) list = list.filter(c => c.toLowerCase().includes(q))
-  sampleSelectorList.value = list
+  loadAllCategories()
 }
 
 function selectSampleForEdit(cat) {
