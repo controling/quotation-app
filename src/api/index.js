@@ -76,7 +76,7 @@ export const quotationsApi = {
 
 // Items (unified)
 export const itemsApi = {
-  list: (params) => api.post("/drug-items/list", params),
+  list: (params) => api.post("/items/list", params),
   all: (type) => api.post("/items/all", { type }),
 }
 
