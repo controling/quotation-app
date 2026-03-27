@@ -334,7 +334,7 @@ async function loadSelectorSamples() {
     const { data } = await api.list({ page: 1, page_size: 20, search: sampleSelectorSearch.value })
     const existingIds = new Set(editForm.value.items.map(i => i.id))
     sampleSelectorGroups.value = (data.samples || []).map(s => ({
-      sample: s.sample,
+      sample: s.category,
       items: (s.items || []).filter(i => !existingIds.has(i.id))
     })).filter(s => s.items.length > 0)
     selectorTotal.value = data.total || 0
@@ -349,8 +349,10 @@ function openSampleSelector() {
   loadSelectorSamples()
 }
 
+let selectorTimer = null
 function filterSampleSelector() {
-  loadSelectorSamples()
+  clearTimeout(selectorTimer)
+  selectorTimer = setTimeout(() => loadSelectorSamples(), 300)
 }
 
 function toggleSampleExpand(sample) {
