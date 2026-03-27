@@ -56,7 +56,7 @@ export function parseExcel(file) {
 }
 
 /**
- * 导出报价单 - 委托检测报价表模板
+ * 导出报价单 - 委托检测报价表模板（与益生报价模板一致）
  */
 export function exportQuotation(quotation) {
   const wb = XLSX.utils.book_new()
@@ -69,18 +69,30 @@ export function exportQuotation(quotation) {
     grouped[sample].push(item)
   })
 
-  // Build data: Row 0 = merged title, Row 1 = headers, Row 2+ = data
+  // Build rows
+  // Row 0 (index 0): Title
+  // Row 1 (index 1): Headers
+  // Row 2+ (index 2+): Data
   const headers = ['序号', '品名', '检测项目', '检测方法', '协议价（元）', '周期（工作日）', '资质', '备注']
-  const dataRows = []
-  const merges = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }] // Title merge
+  const data = []
+  const merges = []
+
+  // Title row
+  const titleRow = ['委托检测报价表']
+  data.push(titleRow)
+
+  // Header row
+  data.push(headers)
+
+  // Data rows
   let seqNo = 0
-  let row = 2
+  let dataStartRow = 2 // 0-indexed row where data starts
 
   for (const [sampleName, items] of Object.entries(grouped)) {
-    const startRow = row
+    const sampleStartRow = dataStartRow
     items.forEach((item, idx) => {
       const qual = [item.cma ? 'CMA' : '', item.cnas ? 'CNAS' : ''].filter(Boolean).join(', ') || '-'
-      dataRows.push([
+      data.push([
         idx === 0 ? ++seqNo : null,
         idx === 0 ? sampleName : null,
         item.name,
@@ -90,20 +102,41 @@ export function exportQuotation(quotation) {
         qual,
         item.description || ''
       ])
-      row++
+      dataStartRow++
     })
+    // Merge 序号 and 品名 cells for multi-item samples
     if (items.length > 1) {
-      merges.push({ s: { r: startRow, c: 0 }, e: { r: row - 1, c: 0 } })
-      merges.push({ s: { r: startRow, c: 1 }, e: { r: row - 1, c: 1 } })
+      // 序号 column (A)
+      merges.push({ s: { r: sampleStartRow, c: 0 }, e: { r: sampleStartRow + items.length - 1, c: 0 } })
+      // 品名列 (B)
+      merges.push({ s: { r: sampleStartRow, c: 1 }, e: { r: sampleStartRow + items.length - 1, c: 1 } })
     }
   }
 
-  const ws = XLSX.utils.aoa_to_sheet([['委托检测报价表'], headers, ...dataRows])
+  // Title merge: A1:H1 (row 0, col 0 to col 7)
+  merges.unshift({ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } })
+
+  const ws = XLSX.utils.aoa_to_sheet(data)
   ws['!merges'] = merges
+
+  // Column widths matching template
   ws['!cols'] = [
-    { wch: 8 }, { wch: 35 }, { wch: 30 }, { wch: 25 },
-    { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 30 }
+    { wch: 10.63 },  // A 序号
+    { wch: 22.63 },  // B 品名
+    { wch: 28.0 },   // C 检测项目
+    { wch: 23.25 },  // D 检测方法
+    { wch: 15.63 },  // E 协议价
+    { wch: 10.63 },  // F 周期
+    { wch: 16.5 },   // G 资质
+    { wch: 33.13 },  // H 备注
   ]
+
+  // Row heights
+  const totalRows = data.length
+  ws['!rows'] = [{ hpt: 79 }] // Title row height
+  for (let i = 1; i < totalRows; i++) {
+    ws['!rows'][i] = { hpt: 31 }
+  }
 
   XLSX.utils.book_append_sheet(wb, ws, 'Sheet2')
   XLSX.writeFile(wb, `${quotation.quote_no}.xlsx`)
