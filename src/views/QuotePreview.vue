@@ -102,7 +102,7 @@
               <div style="display:flex;align-items:center;gap:8px">
                 <span style="font-weight:700;color:var(--primary);font-size:14px">{{ sample.name }}</span>
                 <div style="display:flex;align-items:center;gap:2px">
-                  <input class="form-input" type="number" :value="getEditSampleDiscount(sample.name)" @input="e => setEditSampleDiscount(sample.name, e.target.value)" step="0.1" placeholder="1" style="width:50px;height:24px;font-size:11px;text-align:center;padding:0 4px" />
+                  <input class="form-input" type="number" :value="getEditSampleDiscount(sample.name) ?? ''" @input="e => { const v = parseFloat(e.target.value); setEditSampleDiscount(sample.name, isNaN(v) ? '' : v) }" step="0.1" placeholder="1" style="width:50px;height:24px;font-size:11px;text-align:center;padding:0 4px" />
                   <span style="font-size:10px;color:var(--text-3)">折</span>
                 </div>
               </div>
@@ -129,8 +129,8 @@
               <div class="cart-item-right">
                 <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
                   <span style="font-size:11px;color:var(--text-3)">单价</span>
-                  <input class="form-input" type="number" v-model.number="item.unit_price" style="width:60px;height:28px;font-size:13px;text-align:right;padding:0 4px" />
-                  <input class="form-input" type="number" v-model.number="item.discount" step="0.1" placeholder="1" style="width:44px;height:28px;font-size:12px;text-align:center;padding:0 2px" title="折扣" />
+                  <input class="form-input" type="number" :value="item.unit_price" @input="e => { const v = parseFloat(e.target.value); item.unit_price = isNaN(v) ? 0 : v }" style="width:60px;height:28px;font-size:13px;text-align:right;padding:0 4px" />
+                  <input class="form-input" type="number" :value="item.discount ?? ''" @input="e => { const v = parseFloat(e.target.value); item.discount = isNaN(v) ? '' : v }" step="0.1" placeholder="1" style="width:44px;height:28px;font-size:12px;text-align:center;padding:0 2px" title="折扣" />
                 </div>
                 <div style="display:flex;align-items:center;justify-content:space-between">
                   <van-stepper v-model="item.quantity" :min="1" :max="99" theme="round" button-size="20" />
@@ -150,13 +150,21 @@
           <div v-if="editing" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
             <span style="font-size:13px;color:var(--text-2)">总折扣</span>
             <div style="display:flex;align-items:center;gap:4px">
-              <input class="form-input" type="number" v-model.number="editForm.overall_discount" step="0.1" placeholder="1" style="width:60px;height:30px;font-size:14px;text-align:center;padding:0 4px" />
+              <input class="form-input" type="number" :value="editForm.overall_discount ?? ''" @input="e => { const v = parseFloat(e.target.value); editForm.overall_discount = isNaN(v) ? '' : v }" step="0.1" placeholder="1" style="width:60px;height:30px;font-size:14px;text-align:center;padding:0 4px" />
               <span style="font-size:13px;color:var(--text-3)">折</span>
             </div>
           </div>
           <div v-if="editing && editForm.overall_discount < 1" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
             <span style="font-size:13px;color:var(--text-3)">折扣前</span>
             <span style="font-size:14px;color:var(--text-3);text-decoration:line-through">¥{{ editSubtotal.toFixed(2) }}</span>
+          </div>
+          <div v-if="!editing && quotation.overall_discount && quotation.overall_discount < 1" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:13px;color:var(--text-3)">折扣前</span>
+            <span style="font-size:14px;color:var(--text-3);text-decoration:line-through">¥{{ viewSubtotal.toFixed(2) }}</span>
+          </div>
+          <div v-if="!editing && quotation.overall_discount && quotation.overall_discount < 1" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:13px;color:var(--text-3)">总折扣</span>
+            <span style="font-size:14px;color:var(--danger)">{{ (quotation.overall_discount * 10).toFixed(1) }}折</span>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between">
             <span style="font-size:15px;font-weight:600;color:var(--text-2)">合计金额</span>
@@ -335,7 +343,7 @@ const editSampleGroups = computed(() => {
   editForm.value.items.forEach(item => {
     const cat = item.category || '未分类'
     if (!map[cat]) map[cat] = { name: cat, items: [] }
-    if (!item.discount) item.discount = 1
+    if (item.discount === undefined || item.discount === null) item.discount = 1
     map[cat].items.push(item)
   })
   return Object.values(map)
@@ -349,10 +357,15 @@ function itemLineTotal(item) {
 
 // Sample discount helpers (edit mode)
 function getEditSampleDiscount(name) {
-  return editForm.value.sample_discounts?.[name] ?? 1
+  const v = editForm.value.sample_discounts?.[name]
+  return v != null && v !== '' ? v : ''
 }
 function setEditSampleDiscount(name, val) {
   if (!editForm.value.sample_discounts) editForm.value.sample_discounts = {}
+  if (val === null || val === '' || isNaN(val)) {
+    editForm.value.sample_discounts[name] = ''
+    return
+  }
   const v = parseFloat(val)
   editForm.value.sample_discounts[name] = (v > 0 && v <= 1) ? v : 1
 }
@@ -393,6 +406,12 @@ const finalTotal = computed(() => {
   const subtotal = grouped.reduce((sum, s) => sum + getSampleTotal(s), 0)
   const od = quotation.value.overall_discount && quotation.value.overall_discount > 0 && quotation.value.overall_discount <= 1 ? quotation.value.overall_discount : 1
   return subtotal * od
+})
+
+// View mode subtotal (before overall discount)
+const viewSubtotal = computed(() => {
+  if (!quotation.value) return 0
+  return groupedItems.value.reduce((sum, s) => sum + getSampleTotal(s), 0)
 })
 
 function removeEditItem(id) {
