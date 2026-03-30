@@ -34,7 +34,11 @@ export const useQuotationsStore = defineStore('quotations', () => {
   // Load quotations from API
   async function loadQuotations(params = {}) {
     const { data } = await quotationsApi.list(params)
-    quotations.value = data.items
+    if (params.append) {
+      quotations.value = [...quotations.value, ...data.items]
+    } else {
+      quotations.value = data.items
+    }
     quotationsLoaded.value = true
     return data
   }

@@ -25,3 +25,4 @@ server.log
 # OS
 .DS_Store
 Thumbs.db
+backend/quotation.db
