@@ -60,6 +60,10 @@ export function parseExcel(file) {
  * 导出报价单 - 委托检测报价表模板
  */
 export async function exportQuotation(quotation) {
+  console.log('[EXPORT] quotation.sample_discounts:', JSON.stringify(quotation.sample_discounts))
+  console.log('[EXPORT] quotation.items count:', quotation.items?.length)
+  console.log('[EXPORT] items discounts:', quotation.items?.map(i => `${i.name}:${i.discount}`).join(', '))
+
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('Sheet')
 
@@ -73,6 +77,7 @@ export async function exportQuotation(quotation) {
 
   const overallDiscount = quotation.overall_discount ?? 1
   const sampleDiscounts = quotation.sample_discounts || {}
+  console.log('[EXPORT] parsed sampleDiscounts:', JSON.stringify(sampleDiscounts))
 
   // Check if any item-level discounts exist
   const hasItemDiscount = quotation.items.some(i => (i.discount ?? 1) < 1)
@@ -93,20 +98,20 @@ export async function exportQuotation(quotation) {
     ws.getColumn(1).width = 10.63  // 序号
     ws.getColumn(2).width = 22.63  // 品名
     ws.getColumn(3).width = 28.0   // 检测项目
-    ws.getColumn(4).width = 23.25  // 检测方法
+    ws.getColumn(4).width = 30.0   // 检测方法
     ws.getColumn(5).width = 15.63  // 协议价
-    ws.getColumn(6).width = 10.0   // 折扣
+    ws.getColumn(6).width = 12.0   // 折扣
     ws.getColumn(7).width = 15.63  // 小计
-    ws.getColumn(8).width = 10.63  // 周期
+    ws.getColumn(8).width = 16.0   // 周期
     ws.getColumn(9).width = 16.5   // 资质
     ws.getColumn(10).width = 33.13 // 备注
   } else {
     ws.getColumn(1).width = 10.63  // 序号
     ws.getColumn(2).width = 22.63  // 品名
     ws.getColumn(3).width = 28.0   // 检测项目
-    ws.getColumn(4).width = 23.25  // 检测方法
+    ws.getColumn(4).width = 30.0   // 检测方法
     ws.getColumn(5).width = 15.63  // 协议价
-    ws.getColumn(6).width = 10.63  // 周期
+    ws.getColumn(6).width = 16.0   // 周期
     ws.getColumn(7).width = 16.5   // 资质
     ws.getColumn(8).width = 33.13  // 备注
   }
@@ -219,19 +224,37 @@ export async function exportQuotation(quotation) {
       ws.getCell(sampleStartRow, 2).alignment = { horizontal: 'center', vertical: 'middle' }
     }
 
-    // Sample subtotal row - only show when there's discount
-    if (showDiscCol && hasSampleDiscount && sampleDisc < 1) {
-      const subLabel = `${sampleName} 小计 (${(sampleDisc * 10).toFixed(1)}折)`
-      const row = [null, null, subLabel, null, null, null, sampleFinal]
-      for (let c = 8; c <= totalColCount; c++) row.push(null)
-      ws.addRow(row)
-      ws.mergeCells(ws.rowCount, 2, ws.rowCount, 5)
-      ws.getCell(ws.rowCount, 2).font = { name: '宋体', size: 10, bold: true, color: { argb: 'FF333333' } }
-      ws.getCell(ws.rowCount, 2).alignment = { horizontal: 'right', vertical: 'middle' }
-      ws.getCell(ws.rowCount, 7).font = { name: '宋体', size: 10, bold: true }
-      ws.getCell(ws.rowCount, 7).numFmt = '#,##0.00'
-      ws.getCell(ws.rowCount, 7).alignment = { horizontal: 'right', vertical: 'middle' }
-      ws.getRow(ws.rowCount).height = 22
+    // Sample subtotal row - always show
+    {
+      const discLabel = sampleDisc < 1 ? ` (${(sampleDisc * 10).toFixed(1)}折)` : ''
+      const subLabel = `${sampleName} 小计${discLabel}`
+      const amtColIdx = showDiscCol ? 7 : 5
+
+      // Add empty row first, then set values by cell reference (avoids merge issues)
+      const rowData = new Array(totalColCount).fill(null)
+      ws.addRow(rowData)
+      const r = ws.rowCount
+
+      // Merge label area: B(2) to the column before amount
+      ws.mergeCells(r, 2, r, amtColIdx - 1)
+
+      // Set label AFTER merge
+      ws.getCell(r, 2).value = subLabel
+      ws.getCell(r, 2).font = { name: '宋体', size: 10, bold: true, color: { argb: 'FF333333' } }
+      ws.getCell(r, 2).alignment = { horizontal: 'right', vertical: 'middle' }
+
+      // Set amount
+      ws.getCell(r, amtColIdx).value = sampleFinal
+      ws.getCell(r, amtColIdx).font = { name: '宋体', size: 10, bold: true }
+      ws.getCell(r, amtColIdx).numFmt = '#,##0.00'
+      ws.getCell(r, amtColIdx).alignment = { horizontal: 'right', vertical: 'middle' }
+
+      ws.getRow(r).height = 22
+      // Add top border to subtotal row
+      for (let c = 1; c <= totalColCount; c++) {
+        ws.getCell(r, c).border = { top: { style: 'thin', color: { argb: 'FF999999' } } }
+      }
+      console.log('[EXPORT SUBTOTAL]', sampleName, 'label=', subLabel, 'amount=', sampleFinal, 'amtCol=', amtColIdx)
     }
   }
 
